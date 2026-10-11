@@ -10,6 +10,7 @@
 <link rel="apple-touch-icon" href="icon-192.png">
 <link href="fonts/fonts.css" rel="stylesheet">
 <script src="native.js"></script>
+<script src="health.js"></script>
 <style>
 :root{
   --paper:#EEF1EC; --surface:#F8FAF6; --ink:#18211D; --muted:#56625B; --rule:#CDD4CC;
@@ -2008,7 +2009,7 @@ function finishRun(){
     const rec = toRecord(run), runs = store.get(KEY, []), beat = raceBeat();
     if (beat){ rec.beat = beat; setTimeout(() => { showBadgeText(`You beat ${beat.name}’s best!`); toast(`🏆 You beat ${beat.name}’s best!`); }, 900); }
     runs.unshift(rec);
-    if (store.set(KEY, runs)){ toast('Run saved'); savedId = rec.id; exportAfterRun(rec); planCheck(rec); setTimeout(checkNewBadges, 2600); }
+    if (store.set(KEY, runs)){ toast('Run saved'); savedId = rec.id; exportAfterRun(rec); planCheck(rec); if (window.mmHealth) mmHealth.onSaved(rec); setTimeout(checkNewBadges, 2600); }
     else toast('Couldn’t save: browser storage is full or blocked. Back up and delete old runs.');
   }
   store.del(DRAFT);
@@ -4471,6 +4472,7 @@ function openDetail(id){
   d.querySelector('#ddel').onclick = () => {
     if (!confirm('Delete this run? This can’t be undone.')) return;
     store.set(KEY, allRuns().filter(x => x.id !== id));
+    if (window.mmHealth) mmHealth.onDeleted(id);
     d.close(); renderHistory(); toast('Run deleted');
   };
   d.showModal();
@@ -5122,6 +5124,9 @@ document.addEventListener('click', e => {
   if (b.dataset.bk === 'now') backup();
   else { try { localStorage.setItem(BKSNOOZE, String(Date.now() + 7 * DAY)); } catch(err){} renderHistory(); toast('I’ll remind you in a week'); }
 });
+// hand a few things to health.js (Android app only)
+window.mmApp = { settings, saveSettings, store, toast, runs: () => store.get(KEY, []), profileName: () => curProfile().name };
+window.dispatchEvent(new Event('mmapp-ready'));
 })();
 </script>
 </body>
