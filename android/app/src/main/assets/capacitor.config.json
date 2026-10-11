@@ -1,0 +1,8 @@
+{
+	"appId": "uk.ben.mementum",
+	"appName": "MeMentum",
+	"webDir": "www",
+	"android": {
+		"backgroundColor": "#EEF1EC"
+	}
+}

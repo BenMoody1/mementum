@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">MeMentum</string>
+    <string name="title_activity_main">MeMentum</string>
+    <string name="package_name">uk.ben.mementum</string>
+    <string name="custom_url_scheme">uk.ben.mementum</string>
+</resources>
