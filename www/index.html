@@ -949,8 +949,8 @@ body.picking{overflow:hidden}
 <dialog id="connDlg">
   <h3>Devices</h3>
   <div class="conn">
-    <div class="crow"><div class="status" id="tmStatus" data-state="off"><span class="dot"></span><span id="tmText">Treadmill not connected</span></div><button class="sm" id="tmBtn">Connect</button></div>
-    <div class="crow"><div class="status" id="hrStatus" data-state="off"><span class="dot"></span><span id="hrText">Heart rate monitor not connected</span></div><button class="sm" id="hrBtn">Connect</button></div>
+    <div class="crow"><div class="status" id="tmStatus" data-state="off"><span class="dot"></span><span id="tmText">Treadmill not connected</span></div><span style="display:flex;gap:.4rem;flex-shrink:0"><button class="sm" id="tmPick" hidden>Choose</button><button class="sm" id="tmBtn">Connect</button></span></div>
+    <div class="crow"><div class="status" id="hrStatus" data-state="off"><span class="dot"></span><span id="hrText">Heart rate monitor not connected</span></div><span style="display:flex;gap:.4rem;flex-shrink:0"><button class="sm" id="hrPick" hidden>Choose</button><button class="sm" id="hrBtn">Connect</button></span></div>
     <button class="link" id="all">Treadmill not in the list? Show all nearby devices</button>
   </div>
 
@@ -2297,28 +2297,34 @@ async function connectTreadmill(showAll){
   await openTreadmill(false);
 }
 
+let tmAttempt = 0;
 async function openTreadmill(quiet){
   if (!tmDev) return;
+  const dev = tmDev, my = ++tmAttempt; // a newer attempt (e.g. after Choose) replaces this one
   tmManual = false; tmConnecting = true; renderConn();
   try {
-    const server = await withTimeout(tmDev.gatt.connect(), 15000);
+    const server = await withTimeout(dev.gatt.connect(), 15000);
     let svc;
     try { svc = await server.getPrimaryService(FTMS); } catch(e){ throw new Error('NOFTMS'); }
-    ch = await svc.getCharacteristic(TREADMILL_DATA);
-    ch.removeEventListener('characteristicvaluechanged', onTmValue);
-    ch.addEventListener('characteristicvaluechanged', onTmValue);
-    await ch.startNotifications();
+    const c = await svc.getCharacteristic(TREADMILL_DATA);
+    if (my !== tmAttempt) throw new Error('replaced');
+    c.removeEventListener('characteristicvaluechanged', onTmValue);
+    c.addEventListener('characteristicvaluechanged', onTmValue);
+    await c.startNotifications();
+    if (my !== tmAttempt) throw new Error('replaced');
+    ch = c;
     await setupControl(svc);
-    lastTs = null; rememberDevice('tm', tmDev);
+    lastTs = null; rememberDevice('tm', dev);
     if (!quiet && $('#connDlg').open) setTimeout(() => { if (ch) $('#connDlg').close(); }, 800);
     if (!quiet) showMsg('');
   } catch(e){
+    if (my !== tmAttempt){ try { if (dev !== tmDev) dev.gatt.disconnect(); } catch(_){} return; }
     ch = null; cpCh = null;
     if (!quiet){
       if (e.message === 'NOFTMS') showMsg('Connected, but this device doesn’t send standard treadmill data. Make sure you picked the treadmill.');
-      else showMsg('Couldn’t connect: ' + e.message + '. Close any other app using the treadmill and try again. If it keeps failing, use “Show all nearby devices” to pick it again.');
+      else showMsg('Couldn’t connect: ' + e.message + '. Close any other app using the treadmill and try again. If it keeps failing, tap Choose to pick it again.');
     }
-    try { tmDev.gatt.disconnect(); } catch(_){}
+    try { dev.gatt.disconnect(); } catch(_){}
   }
   tmConnecting = false; renderConn(); renderLive(); renderSettings();
 }
@@ -2363,21 +2369,27 @@ async function connectHr(){
   hrDev = d; hrDev.addEventListener('gattserverdisconnected', onHrDisconnect);
   await openHr(false);
 }
+let hrAttempt = 0;
 async function openHr(quiet){
   if (!hrDev) return;
+  const dev = hrDev, my = ++hrAttempt; // a newer attempt (e.g. after Choose) replaces this one
   hrManual = false; hrConnecting = true; renderConn();
   try {
-    const s = await withTimeout(hrDev.gatt.connect(), 15000);
+    const s = await withTimeout(dev.gatt.connect(), 15000);
     const svc = await s.getPrimaryService('heart_rate');
-    hrCh = await svc.getCharacteristic('heart_rate_measurement');
-    hrCh.removeEventListener('characteristicvaluechanged', onHrValue);
-    hrCh.addEventListener('characteristicvaluechanged', onHrValue);
-    await hrCh.startNotifications();
-    rememberDevice('hr', hrDev);
+    const c = await svc.getCharacteristic('heart_rate_measurement');
+    if (my !== hrAttempt) throw new Error('replaced');
+    c.removeEventListener('characteristicvaluechanged', onHrValue);
+    c.addEventListener('characteristicvaluechanged', onHrValue);
+    await c.startNotifications();
+    if (my !== hrAttempt) throw new Error('replaced');
+    hrCh = c;
+    rememberDevice('hr', dev);
   } catch(e){
+    if (my !== hrAttempt){ try { if (dev !== hrDev) dev.gatt.disconnect(); } catch(_){} return; }
     hrCh = null;
-    if (!quiet) showMsg('Couldn’t connect to the heart rate monitor: ' + e.message);
-    try { hrDev.gatt.disconnect(); } catch(_){}
+    if (!quiet) showMsg('Couldn’t connect to the heart rate monitor: ' + e.message + '. Make sure heart rate broadcast is on, or tap Choose to pick it again.');
+    try { dev.gatt.disconnect(); } catch(_){}
   }
   hrConnecting = false; renderConn();
 }
@@ -2449,6 +2461,8 @@ function renderConn(){
   $('#hrText').textContent = hrCh ? `${hrDev.name || 'Heart rate monitor'} connected` : hrConnecting ? 'Connecting to heart rate monitor…' : hrDev ? `${hrDev.name || 'Heart rate monitor'} not connected${hrManual ? '' : ', retrying…'}` : 'Heart rate monitor not connected';
   $('#hrBtn').textContent = hrCh ? 'Disconnect' : hrDev ? 'Reconnect' : 'Connect';
   $('#hrBtn').disabled = hrConnecting;
+  $('#tmPick').hidden = !!ch || !tmDev || isDemo;
+  $('#hrPick').hidden = !!hrCh || !hrDev;
   $('#demo').textContent = isDemo ? 'Stop demo' : 'Try a demo';
   $('#demoStop').hidden = !isDemo;
   $('#demo').hidden = !!ch || tmConnecting;
@@ -4690,6 +4704,8 @@ $('#cogBtn').onclick = () => showTab(curTab === 'settings' ? backTab : 'settings
 $('#tmBtn').onclick = () => ch ? disconnectTreadmill() : tmDev ? openTreadmill(false) : connectTreadmill(false);
 $('#all').onclick = () => connectTreadmill(true);
 $('#hrBtn').onclick = () => hrCh ? disconnectHr() : hrDev ? openHr(false) : connectHr();
+$('#tmPick').onclick = () => connectTreadmill(false);
+$('#hrPick').onclick = () => connectHr();
 $('#demo').onclick = () => { if (isDemo) stopDemo(); else { showTab('run'); startDemo(); } };
 $('#demoStop').onclick = () => stopDemo();
 $('#finish').onclick = finishRun;
