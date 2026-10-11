@@ -42,6 +42,12 @@
             </intent-filter>
         </activity-alias>
 
+        <!-- "Run in progress" notification that keeps Bluetooth alive -->
+        <service
+            android:name=".RunService"
+            android:exported="false"
+            android:foregroundServiceType="connectedDevice" />
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"
@@ -57,6 +63,13 @@
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.VIBRATE" />
+
+    <!-- Notifications: reminders and the run-in-progress service -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
+    <!-- lets the connected-device service start even before Bluetooth permission is granted -->
+    <uses-permission android:name="android.permission.CHANGE_NETWORK_STATE" />
 
     <!-- Health Connect: write finished runs -->
     <uses-permission android:name="android.permission.health.WRITE_EXERCISE" />
