@@ -46,9 +46,23 @@
     for (var i = 0; i < a.length; i++) a[i] = parseInt(hex.substr(i * 2, 2), 16);
     return new DataView(a.buffer);
   }
-  // Android's Bluetooth stack can only do one operation at a time, so queue them.
-  var q = Promise.resolve();
-  function queued(fn) { var r = q.then(fn, fn); q = r.catch(function () {}); return r; }
+  // Android handles one Bluetooth operation per device at a time, so each device gets its own
+  // queue (the treadmill can't hold up the heart-rate monitor), and every operation has a time
+  // limit so one unanswered request can never jam the queue.
+  var queues = {};
+  function withLimit(p, ms) {
+    return new Promise(function (res, rej) {
+      var t = setTimeout(function () { rej(new Error('timed out')); }, ms);
+      p.then(function (v) { clearTimeout(t); res(v); }, function (e) { clearTimeout(t); rej(e); });
+    });
+  }
+  function queued(key, fn, ms) {
+    var q = queues[key] || Promise.resolve();
+    var run = function () { return withLimit(Promise.resolve().then(fn), ms || 8000); };
+    var r = q.then(run, run);
+    queues[key] = r.catch(function () {});
+    return r;
+  }
 
   function friendly(e) {
     var m = (e && e.message) || String(e);
@@ -103,19 +117,22 @@
     return init().then(function () {
       if (self.connected) return self;
       if (!self._discSub) self._discSub = listen(BLE, 'disconnected|' + id, function () { self._fireDisconnect(); });
-      return queued(function () { return call(BLE, 'connect', { deviceId: id, timeout: 12000 }); })
-        .then(function () { self.connected = true; self._live = true; self._svcs = null; return self; });
+      return queued(id, function () { return call(BLE, 'connect', { deviceId: id, timeout: 12000 }); }, 15000)
+        .then(function () { self.connected = true; self._live = true; self._svcs = null; return self; }, function (e) {
+          call(BLE, 'disconnect', { deviceId: id }).catch(function () {});   // cancel a half-made connection
+          throw e;
+        });
     });
   };
   Gatt.prototype.disconnect = function () {
     var id = this.device.id, was = this._live;
-    queued(function () { return call(BLE, 'disconnect', { deviceId: id }); }).catch(function () {});
+    queued(id, function () { return call(BLE, 'disconnect', { deviceId: id }); }).catch(function () {});
     if (was) this._fireDisconnect();   // Chrome fires the event on a manual disconnect too
   };
   Gatt.prototype._services = function () {
     var self = this;
     if (self._svcs) return Promise.resolve(self._svcs);
-    return queued(function () { return call(BLE, 'getServices', { deviceId: self.device.id }); })
+    return queued(self.device.id, function () { return call(BLE, 'getServices', { deviceId: self.device.id }); })
       .then(function (r) { self._svcs = (r && r.services) || []; return self._svcs; });
   };
   Gatt.prototype.getPrimaryService = function (s) {
@@ -148,14 +165,14 @@
     ch.service = service; ch.uuid = id; ch.value = null; ch._sub = null;
     var ids = function () { return { deviceId: ch.service.device.id, service: ch.service.uuid, characteristic: ch.uuid }; };
     ch.readValue = function () {
-      return queued(function () { return call(BLE, 'read', ids()); }).then(function (r) { ch.value = toView(r && r.value); return ch.value; });
+      return queued(ch.service.device.id, function () { return call(BLE, 'read', ids()); }).then(function (r) { ch.value = toView(r && r.value); return ch.value; });
     };
     ch.writeValueWithResponse = function (data) {
-      return queued(function () { var o = ids(); o.value = toHex(data); return call(BLE, 'write', o); }).then(function () {});
+      return queued(ch.service.device.id, function () { var o = ids(); o.value = toHex(data); return call(BLE, 'write', o); }).then(function () {});
     };
     ch.writeValue = ch.writeValueWithResponse;
     ch.writeValueWithoutResponse = function (data) {
-      return queued(function () { var o = ids(); o.value = toHex(data); return call(BLE, 'writeWithoutResponse', o); }).then(function () {});
+      return queued(ch.service.device.id, function () { var o = ids(); o.value = toHex(data); return call(BLE, 'writeWithoutResponse', o); }).then(function () {});
     };
     ch.startNotifications = function () {
       var i = ids();
@@ -164,11 +181,11 @@
         ch.value = toView(ev && ev.value);
         ch.dispatchEvent(new Event('characteristicvaluechanged'));
       });
-      return queued(function () { return call(BLE, 'startNotifications', i); }).then(function () { return ch; });
+      return queued(i.deviceId, function () { return call(BLE, 'startNotifications', i); }).then(function () { return ch; });
     };
     ch.stopNotifications = function () {
       if (ch._sub) { ch._sub.remove(); ch._sub = null; }
-      return queued(function () { return call(BLE, 'stopNotifications', ids()); }).then(function () { return ch; });
+      return queued(ch.service.device.id, function () { return call(BLE, 'stopNotifications', ids()); }).then(function () { return ch; });
     };
     return ch;
   }
@@ -192,7 +209,7 @@
       }
       if (opts.optionalServices) o.optionalServices = opts.optionalServices.map(uuid);
       return init().then(ensureOn)
-        .then(function () { return queued(function () { return call(BLE, 'requestDevice', o); }); })
+        .then(function () { return queued('picker', function () { return call(BLE, 'requestDevice', o); }, 120000); })
         .then(function (r) { remember(r.deviceId); return getDev(r.deviceId, r.name); }, function (e) {
           var m = (e && e.message) || '';
           if (/cancel|no device|not found|dismiss/i.test(m)) throw domErr('NotFoundError', 'User cancelled the requestDevice() chooser.');

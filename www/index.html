@@ -11,6 +11,7 @@
 <link href="fonts/fonts.css" rel="stylesheet">
 <script src="native.js"></script>
 <script src="health.js"></script>
+<script src="notify.js"></script>
 <style>
 :root{
   --paper:#EEF1EC; --surface:#F8FAF6; --ink:#18211D; --muted:#56625B; --rule:#CDD4CC;
@@ -1085,6 +1086,16 @@ if (!settings.goalSet && settings.weeklyGoal === 20000) settings.weeklyGoal = 0;
 const saveSettings = () => store.set(SKEY, settings);
 let selected = store.get(SELKEY, null);
 const devices = store.get(DEVKEY, {});
+// The treadmill is shared, but each profile remembers its own heart rate monitor.
+const HRDEVKEY = 'tm-hrdev-v1';
+{
+  const mine = store.get(HRDEVKEY, null);
+  if (devices.hr){ // older versions kept one monitor for everyone: give it to this profile only
+    if (!mine) store.set(HRDEVKEY, devices.hr);
+    const g = { ...devices }; delete g.hr; store.set(DEVKEY, g);
+  }
+  devices.hr = mine || devices.hr || null;
+}
 
 /* ---------- state ---------- */
 let tmDev = null, ch = null, tmConnecting = false, tmManual = false, tmReconnecting = false;
@@ -2260,7 +2271,11 @@ function controlAvailable(){ return settings.control && (isDemo || (!!ch && ctrl
 
 /* ---------- treadmill connection ---------- */
 const onTmValue = e => onData(parseTreadmill(e.target.value));
-function rememberDevice(kind, d){ devices[kind] = d.id; store.set(DEVKEY, devices); }
+function rememberDevice(kind, d){
+  devices[kind] = d.id;
+  if (kind === 'hr'){ store.set(HRDEVKEY, d.id); return; }
+  const g = { ...devices }; delete g.hr; store.set(DEVKEY, g);
+}
 
 async function connectTreadmill(showAll){
   if (!navigator.bluetooth){ showMsg('Bluetooth isn’t available in this browser. Open this file in Chrome on your Android phone. You can still try a demo from Settings.'); return; }
@@ -2389,6 +2404,12 @@ async function restoreDevices(){
   } catch(e){}
 }
 
+// Keep trying remembered devices whenever they aren't connected, until you tap Disconnect.
+setInterval(() => {
+  if (hrDev && !hrCh && !hrConnecting && !hrReconnecting && !hrManual) openHr(true);
+  if (tmDev && !ch && !tmConnecting && !tmReconnecting && !tmManual && !isDemo) openTreadmill(true);
+}, 15000);
+
 /* ---------- demo ---------- */
 function startDemo(){
   isDemo = true; lastTs = null; showMsg('');
@@ -2421,11 +2442,11 @@ function stopDemo(){
 function renderConn(){
   const tm = $('#tmStatus'), hr = $('#hrStatus');
   tm.dataset.state = (ch || isDemo) ? 'on' : tmConnecting ? 'busy' : 'off';
-  $('#tmText').textContent = isDemo ? 'Demo treadmill' : ch ? `${tmDev.name || 'Treadmill'} connected${ctrl.ok ? ', control available' : ''}` : tmConnecting ? 'Connecting to treadmill…' : tmDev ? `${tmDev.name || 'Treadmill'} not connected` : 'Treadmill not connected';
+  $('#tmText').textContent = isDemo ? 'Demo treadmill' : ch ? `${tmDev.name || 'Treadmill'} connected${ctrl.ok ? ', control available' : ''}` : tmConnecting ? 'Connecting to treadmill…' : tmDev ? `${tmDev.name || 'Treadmill'} not connected${tmManual ? '' : ', retrying…'}` : 'Treadmill not connected';
   $('#tmBtn').textContent = ch ? 'Disconnect' : tmDev ? 'Reconnect' : 'Connect';
   $('#tmBtn').hidden = isDemo; $('#tmBtn').disabled = tmConnecting;
   hr.dataset.state = hrCh ? 'on' : hrConnecting ? 'busy' : 'off';
-  $('#hrText').textContent = hrCh ? `${hrDev.name || 'Heart rate monitor'} connected` : hrConnecting ? 'Connecting to heart rate monitor…' : hrDev ? `${hrDev.name || 'Heart rate monitor'} not connected` : 'Heart rate monitor not connected';
+  $('#hrText').textContent = hrCh ? `${hrDev.name || 'Heart rate monitor'} connected` : hrConnecting ? 'Connecting to heart rate monitor…' : hrDev ? `${hrDev.name || 'Heart rate monitor'} not connected${hrManual ? '' : ', retrying…'}` : 'Heart rate monitor not connected';
   $('#hrBtn').textContent = hrCh ? 'Disconnect' : hrDev ? 'Reconnect' : 'Connect';
   $('#hrBtn').disabled = hrConnecting;
   $('#demo').textContent = isDemo ? 'Stop demo' : 'Try a demo';
@@ -5057,7 +5078,7 @@ $('#forget').onclick = async () => {
   if (!confirm('Forget saved devices? You’ll pick them from the list next time.')) return;
   for (const d of [tmDev, hrDev]) { try { d && d.forget && await d.forget(); } catch(e){} }
   disconnectTreadmill(); disconnectHr();
-  tmDev = null; hrDev = null; delete devices.tm; delete devices.hr; store.set(DEVKEY, devices);
+  tmDev = null; hrDev = null; delete devices.tm; delete devices.hr; store.set(DEVKEY, devices); store.del(HRDEVKEY);
   renderConn(); toast('Saved devices forgotten');
 };
 $('#wipe').onclick = () => {
@@ -5124,8 +5145,9 @@ document.addEventListener('click', e => {
   if (b.dataset.bk === 'now') backup();
   else { try { localStorage.setItem(BKSNOOZE, String(Date.now() + 7 * DAY)); } catch(err){} renderHistory(); toast('I’ll remind you in a week'); }
 });
-// hand a few things to health.js (Android app only)
-window.mmApp = { settings, saveSettings, store, toast, runs: () => store.get(KEY, []), profileName: () => curProfile().name };
+// hand a few things to health.js and notify.js (Android app only)
+window.mmApp = { settings, saveSettings, store, toast, runs: () => store.get(KEY, []), profileName: () => curProfile().name,
+  liveRun: () => run, live: () => live, computeStreak, allRuns, profileRuns, weekStart, dayKey, profiles };
 window.dispatchEvent(new Event('mmapp-ready'));
 })();
 </script>
