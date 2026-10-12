@@ -1171,12 +1171,16 @@ function toast(text){
 function showMsg(text){ for (const id of ['#msg', '#connMsg']){ const m = $(id); if (m){ m.textContent = text || ''; m.hidden = !text; } } }
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const withTimeout = (p, ms) => Promise.race([p, new Promise((_, rej) => setTimeout(() => rej(new Error('timed out')), ms))]);
+// Saves a file and resolves with { saved: 'downloads' | 'shared', name }. In the Android app the
+// file goes through native.js (public Downloads folder, share sheet as a fallback).
 function download(name, text, type){
+  if (window.mmFiles) return mmFiles.save(name, text, type);
   const blob = new Blob([text], { type });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob); a.download = name;
   document.body.appendChild(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(a.href), 3000);
+  return Promise.resolve({ saved: 'downloads', name });
 }
 
 /* ---------- audio ---------- */
@@ -4502,12 +4506,26 @@ function openDetail(id){
   });
   d.querySelector('#dnote').addEventListener('input', e => updateRun(id, x => x.note = e.target.value));
   d.querySelector('#dclose').onclick = () => { d.close(); renderHistory(); };
-  d.querySelector('#dtcx').onclick = () => {
-    const rec = allRuns().find(x => x.id === id), name = tcxName(rec);
-    download(name, buildTcx(rec), 'application/vnd.garmin.tcx+xml');
-    // open Garmin's import page in the same tap, so the browser doesn't block it
-    window.open(GARMIN_IMPORT, '_blank', 'noopener');
-    toast(`Saved ${name} to Downloads. On Garmin’s page, choose Import Data and pick that file.`);
+  d.querySelector('#dtcx').onclick = async e => {
+    const btn = e.currentTarget, rec = allRuns().find(x => x.id === id), name = tcxName(rec);
+    if (!window.mmFiles){
+      download(name, buildTcx(rec), TCX_TYPE);
+      // browser: open Garmin's import page in the same tap, so the pop-up blocker allows it
+      window.open(GARMIN_IMPORT, '_blank', 'noopener');
+      toast(`Saved ${name} to Downloads. On Garmin’s page, choose Import Data and pick that file.`);
+      return;
+    }
+    // app: make sure the file is really saved before leaving for Garmin's page
+    btn.disabled = true;
+    try {
+      const r = await download(name, buildTcx(rec), TCX_TYPE);
+      toast(r.saved === 'downloads'
+        ? `Saved ${r.name} to Downloads. Opening Garmin Connect: choose Import Data and pick that file.`
+        : 'File shared. Opening Garmin Connect: choose Import Data and pick the file from where you sent it.');
+      setTimeout(() => window.open(GARMIN_IMPORT, '_blank', 'noopener'), 2500);
+    } catch(err){
+      toast(err && err.name === 'AbortError' ? 'Export cancelled' : 'Couldn’t save the run file, so Garmin Connect wasn’t opened');
+    } finally { btn.disabled = false; }
   };
   d.querySelector('#ddel').onclick = () => {
     if (!confirm('Delete this run? This can’t be undone.')) return;
@@ -4522,11 +4540,13 @@ function openDetail(id){
 
 /* ---------- exports ---------- */
 function tcxName(rec){ const dt = new Date(rec.date); return `treadmill-run-${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())}_${pad(dt.getHours())}-${pad(dt.getMinutes())}.tcx`; }
-const GARMIN_IMPORT = 'https://connect.garmin.com/modern/import-data';
+const GARMIN_IMPORT = 'https://connect.garmin.com/modern/import-data', TCX_TYPE = 'application/vnd.garmin.tcx+xml';
+const saveFailed = e => { if (!e || e.name !== 'AbortError') toast('Couldn’t save the file'); };
 function exportAfterRun(rec){
   if (settings.autoExport === 'file'){
-    download(tcxName(rec), buildTcx(rec), 'application/vnd.garmin.tcx+xml');
-    setTimeout(() => toast('Run saved to your Downloads, ready to import into Garmin Connect'), 900);
+    download(tcxName(rec), buildTcx(rec), TCX_TYPE).then(r => setTimeout(() => toast(r.saved === 'shared'
+      ? 'Run file shared, ready to import into Garmin Connect'
+      : `Run saved to your Downloads as ${r.name}, ready to import into Garmin Connect`), 900), saveFailed);
   } else if (settings.autoExport === 'share') shareRun(rec);
 }
 async function shareRun(rec){
@@ -4537,8 +4557,7 @@ async function shareRun(rec){
     try { await navigator.share({ files: [file], title: 'Treadmill run' }); return; }
     catch(e){ if (e.name === 'AbortError') return; }
   }
-  download(name, text, 'application/vnd.garmin.tcx+xml');
-  setTimeout(() => toast('Android couldn’t share this file type, so it was saved to your Downloads instead'), 900);
+  download(name, text, TCX_TYPE).then(() => setTimeout(() => toast('Android couldn’t share this file type, so it was saved to your Downloads instead'), 900), saveFailed);
 }
 
 function buildTcx(r){
@@ -4578,17 +4597,19 @@ function exportCsv(){
     fmtPace(avgPaceKm(r.moving, r.dist)), r.maxSpeed, r.climb, r.avgIncline, r.kcal ?? '', r.avgHr ?? '', r.maxHr ?? '', r.steps ?? '', r.cadence ?? '',
     r.workout || '', (r.tags || []).join('; '), r.note || ''
   ].map(q).join(',')));
-  download('treadmill-runs.csv', lines.join('\n'), 'text/csv');
+  download('treadmill-runs.csv', lines.join('\n'), 'text/csv').catch(saveFailed);
 }
 const LASTBK = 'tm-lastbackup-v1', BKSNOOZE = 'tm-bksnooze-v1', DAY = 864e5;
 function backup(){
   const data = { app: 'treadmill-log', version: 3, exported: new Date().toISOString(), profiles: profiles.list, people: {},
     runs: allRuns(), workouts: customWorkouts(), settings, plan: activePlan() }; // single-profile fields kept for older versions
   profiles.list.forEach(x => { data.people[x.id] = { runs: rawGet(KEY, x.id, []), workouts: rawGet(WKEY, x.id, []), settings: rawGet(SKEY, x.id, {}), plan: rawGet(PKEY, x.id, null) }; });
-  download(`treadmill-log-backup-${new Date().toISOString().slice(0, 10)}.json`, JSON.stringify(data), 'application/json');
-  try { localStorage.setItem(LASTBK, String(Date.now())); localStorage.removeItem(BKSNOOZE); } catch(e){}
-  toast(`Backup downloaded, covering ${profiles.list.length} profile${profiles.list.length === 1 ? '' : 's'}`);
-  renderHistory(); renderBackupStatus();
+  const n = profiles.list.length, covers = `covering ${n} profile${n === 1 ? '' : 's'}`;
+  download(`treadmill-log-backup-${new Date().toISOString().slice(0, 10)}.json`, JSON.stringify(data), 'application/json').then(r => {
+    try { localStorage.setItem(LASTBK, String(Date.now())); localStorage.removeItem(BKSNOOZE); } catch(e){}
+    toast(r.saved === 'shared' ? `Backup shared, ${covers}` : `Backup saved to Downloads as ${r.name}, ${covers}`);
+    renderHistory(); renderBackupStatus();
+  }, e => toast(e && e.name === 'AbortError' ? 'Backup cancelled, nothing was saved' : 'Couldn’t save the backup'));
 }
 function totalRunsAllProfiles(){ return profiles.list.reduce((a, x) => a + rawGet(KEY, x.id, []).length, 0); }
 function backupDue(){

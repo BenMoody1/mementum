@@ -5,7 +5,7 @@
  *   - navigator.bluetooth  (Web Bluetooth subset)  -> @capacitor-community/bluetooth-le
  *   - speechSynthesis      (spoken cues)           -> @capacitor-community/text-to-speech
  *   - navigator.wakeLock   (screen stays on)       -> @capacitor-community/keep-awake
- *   - <a download> files   (backups, TCX)          -> @capacitor/filesystem, Share fallback
+ *   - <a download> files   (backups, TCX)          -> MeMentumFiles (MediaStore), Filesystem, Share fallback
  *   - navigator.share      (share a run)           -> @capacitor/share
  * In Chrome / GitHub Pages it does nothing.
  */
@@ -293,12 +293,25 @@
       throw e;
     });
   }
-  // "Download": save into the phone's Download folder; if Android refuses, open the share sheet instead.
+  // "Download": save into the phone's public Download folder (MediaStore, no permission needed on
+  // Android 10+), then the older Filesystem route, and if both fail open the share sheet instead.
+  // Resolves with { saved: 'downloads' | 'shared', name } so the app can say where the file went.
   function saveToDownloads(blob, name) {
+    name = safeName(name);
     return blobToBase64(blob).then(function (data) {
-      return call('Filesystem', 'writeFile', { path: 'Download/' + safeName(name), data: data, directory: 'EXTERNAL_STORAGE', recursive: true });
-    }).catch(function () { return shareBlobs([{ blob: blob, name: name }], name); });
+      return call('MeMentumFiles', 'saveDownload', { name: name, data: data })
+        .then(function (r) { return { saved: 'downloads', name: (r && r.name) || name }; })
+        .catch(function () {
+          return call('Filesystem', 'writeFile', { path: 'Download/' + name, data: data, directory: 'EXTERNAL_STORAGE', recursive: true })
+            .then(function () { return { saved: 'downloads', name: name }; });
+        });
+    }).catch(function () {
+      return shareBlobs([{ blob: blob, name: name }], name).then(function () { return { saved: 'shared', name: name }; });
+    });
   }
+  window.mmFiles = {
+    save: function (name, text, type) { return saveToDownloads(new Blob([text], { type: type || 'application/octet-stream' }), name); }
+  };
   var origClick = HTMLAnchorElement.prototype.click;
   HTMLAnchorElement.prototype.click = function () {
     var href = this.href || '';
