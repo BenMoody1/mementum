@@ -538,6 +538,13 @@ nav.tabs button{padding:0 .15rem;font-size:.86rem}
 .cal-d.hol{background:#FFF1C9}
 .wp-dot.hol,.sk-d.hol{background:#FFF1C9}
 .hollist{list-style:none;padding:0;margin:.8rem 0 0}
+.wtbox{margin:.2rem 0 1.2rem}
+.wtbox .wtnow{display:flex;align-items:baseline;gap:.5rem;flex-wrap:wrap}
+.wtbox .wtnow b{font-family:var(--num);font-weight:600;font-size:1.9rem;line-height:1}
+.wtbox p{margin:.25rem 0}
+.wtdue{font-weight:600;color:var(--track)}
+.wtst{display:flex;gap:.5rem;align-items:center}
+.wtst input{width:5rem}
 .hollist li{display:flex;justify-content:space-between;align-items:center;gap:.5rem;padding:.45rem 0;border-bottom:1px solid var(--rule)}
 .cal-d.today{box-shadow:0 0 0 2px var(--ink)}
 .cal-d.fut{color:var(--rule)}
@@ -743,6 +750,8 @@ body.picking{overflow:hidden}
   <div class="ppane" data-pane="over">
   <div id="bkNagH"></div>
   <div class="goalbox" id="goalbox"></div>
+  <div id="wtSect"><h3 style="margin-top:0">Weight</h3>
+  <div class="wtbox" id="wtBox"></div></div>
   <div class="row" style="margin-bottom:1.2rem"><button class="sm" id="lastWeekBtn">Last week’s summary</button><button class="sm" id="lastMonthBtn">Last month’s report</button></div>
   <div class="seg" id="chartSeg" role="group" aria-label="Chart">
     <button data-c="week" aria-pressed="true">Weekly</button><button data-c="month" aria-pressed="false">Monthly</button><button data-c="pace" aria-pressed="false">Pace trend</button>
@@ -883,6 +892,7 @@ body.picking{overflow:hidden}
   <div class="row"><button class="sm" id="testConfetti">Test confetti</button><button class="sm" id="testSuper">Test finish celebration</button></div>
   <label class="check"><input type="checkbox" id="setConfettiSound"><span>Play a sound with confetti</span></label>
   <label class="check"><input type="checkbox" id="setSummary"><span>Show a summary of last week when a new week starts</span></label>
+  <label class="check"><input type="checkbox" id="setWtTrack"><span>Track my weight (weekly weigh-ins on the Profile tab and in the reports)</span></label>
 
   <h3>Treadmill control</h3>
   <label class="check"><input type="checkbox" id="setControl"><span>Let workouts and the on-screen buttons change speed and incline</span></label>
@@ -966,6 +976,7 @@ body.picking{overflow:hidden}
 <dialog id="profDlg"></dialog>
 <dialog id="detail"></dialog>
 <dialog id="sumDlg"></dialog>
+<dialog id="wtDlg"></dialog>
 <dialog id="builder"></dialog>
 <div class="toast" id="toast" hidden></div>
 <div class="whopick" id="whoPick" role="dialog" aria-modal="true" aria-labelledby="whoQ" hidden></div>
@@ -3108,6 +3119,7 @@ function openSummary(ws){
     ${pbs.length ? `<h4>New personal bests</h4><ul class="sumlist">${pbs.map(x => `<li>${esc(x)}</li>`).join('')}</ul>` : ''}
     ${plan ? `<p>${planDone} training plan session${planDone === 1 ? '' : 's'} completed.</p>` : ''}`
     : '<p class="muted">No runs logged that week.</p>'}
+    ${wtReportLine(start, end.getTime(), 'this week')}
     <div class="drow"><span></span><button class="sm primary" id="sumClose">Close</button></div>`;
   d.querySelector('#sumClose').onclick = () => d.close();
   d.showModal();
@@ -4377,13 +4389,129 @@ function showPsub(k){
   $$('#psub button').forEach(b => { b.setAttribute('aria-selected', b.dataset.p === k); b.classList.toggle('on', b.dataset.p === k); });
   $$('#tab-history .ppane').forEach(x => x.hidden = x.dataset.pane !== k);
 }
+/* ---------- weight: a weekly weigh-in, shown on the Profile tab and in the weekly and monthly reports ----------
+ * Weigh-ins live in the profile's settings (settings.weighIns = [{ d: 'YYYY-MM-DD', kg }]), so they're per runner,
+ * included in backups and synced with the household without any change to sync.js. The newest weigh-in also
+ * updates settings.weight, which the calorie estimates use. settings.wtUnit is 'kg', 'st' (stone and pounds) or 'lb'. */
+const LB = 2.20462;
+const isoDay = t => { const d = new Date(t); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; };
+const wtTime = e => new Date(e.d + 'T12:00').getTime();
+const weighIns = () => (Array.isArray(settings.weighIns) ? settings.weighIns : []).filter(e => e && /^\d{4}-\d\d-\d\d$/.test(e.d) && e.kg > 0).slice().sort((a, b) => a.d < b.d ? -1 : a.d > b.d ? 1 : 0);
+const wtOn = () => settings.wtTrack !== false;   // on unless switched off in Settings (per runner)
+const wtUnit = () => ['kg', 'st', 'lb'].includes(settings.wtUnit) ? settings.wtUnit : 'kg';
+function wtFmt(kg, unit = wtUnit()){
+  if (unit === 'kg') return `${(+kg).toFixed(1)} kg`;
+  const lb = Math.round(kg * LB * 10) / 10;
+  if (unit === 'lb') return `${lb.toFixed(1)} lb`;
+  let st = Math.floor(lb / 14), rem = Math.round((lb - st * 14) * 10) / 10; if (rem >= 14){ st++; rem = 0; }
+  return `${st} st ${rem % 1 ? rem.toFixed(1) : rem} lb`;
+}
+function wtDiffFmt(kg){ // a change, always shown as a size (the words say up or down)
+  const a = Math.abs(kg), u = wtUnit();
+  if (u === 'kg') return `${a.toFixed(1)} kg`;
+  return a * LB >= 14 && u === 'st' ? wtFmt(a, 'st') : `${(a * LB).toFixed(1)} lb`;
+}
+const wtChange = kg => Math.abs(kg) < .05 ? 'No change' : kg < 0 ? `Lost ${wtDiffFmt(kg)}` : `Gained ${wtDiffFmt(kg)}`;
+// change over a period: the last weigh-in in it compared with the last one before it (or the first one in it)
+function wtPeriod(from, to){
+  const all = weighIns(), inP = all.filter(e => wtTime(e) >= from && wtTime(e) < to);
+  if (!inP.length) return null;
+  const before = all.filter(e => wtTime(e) < from), base = before.length ? before[before.length - 1] : inP[0], last = inP[inP.length - 1];
+  return { now: last.kg, change: base === last ? null : last.kg - base.kg };
+}
+function wtReportLine(from, to, label){
+  if (!wtOn()) return '';
+  const p = wtPeriod(from, to);
+  if (!p) return '';
+  return `<p>⚖️ Weight: ${p.change == null ? `weighed in at <strong>${wtFmt(p.now)}</strong> ${label}.` : `<strong>${wtChange(p.change)}</strong> ${label}, now ${wtFmt(p.now)}.`}</p>`;
+}
+function wtChart(list){
+  const W = 320, H = 132, pl = 44, pr = 8, pt = 10, pb = 18, u = wtUnit();
+  const val = kg => u === 'kg' ? kg : kg * LB;
+  let mn = Math.min(...list.map(e => val(e.kg))), mx = Math.max(...list.map(e => val(e.kg)));
+  if (mx - mn < 2){ const m = (mx + mn) / 2; mn = m - 1; mx = m + 1; }
+  const t0 = wtTime(list[0]), t1 = wtTime(list[list.length - 1]), span = Math.max(1, t1 - t0);
+  const X = e => pl + (W - pl - pr) * (wtTime(e) - t0) / span, Y = kg => pt + (H - pt - pb) * (mx - val(kg)) / (mx - mn);
+  const lab = v => u === 'kg' ? `${v.toFixed(1)} kg` : u === 'lb' ? `${v.toFixed(0)} lb` : wtFmt(v / LB, 'st');
+  let svg = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Weight over time">`;
+  [mn, mx].forEach(v => { const y = pt + (H - pt - pb) * (mx - v) / (mx - mn); svg += `<line x1="${pl}" x2="${W - pr}" y1="${y.toFixed(1)}" y2="${y.toFixed(1)}" class="grd"/><text x="${pl - 4}" y="${(y + 3).toFixed(1)}" class="ax" text-anchor="end">${esc(lab(v))}</text>`; });
+  svg += `<polyline class="sline" points="${list.map(e => X(e).toFixed(1) + ',' + Y(e.kg).toFixed(1)).join(' ')}"/>`;
+  list.forEach(e => { svg += `<circle cx="${X(e).toFixed(1)}" cy="${Y(e.kg).toFixed(1)}" r="2.6" class="pdot"/>`; });
+  const short = t => new Date(t).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+  svg += `<text x="${pl}" y="${H - 4}" class="ax">${short(t0)}</text><text x="${W - pr}" y="${H - 4}" class="ax" text-anchor="end">${short(t1)}</text>`;
+  return svg + '</svg>';
+}
+function renderWeight(){
+  const box = $('#wtBox'); if (!box) return;
+  $('#wtSect').hidden = !wtOn();
+  if (!wtOn()){ box.innerHTML = ''; return; }
+  const all = weighIns(), wk = weekStart(Date.now()).getTime();
+  if (!all.length){
+    box.innerHTML = `<p class="muted">Weigh yourself once a week and log it here to see how your weight changes. It also keeps your calorie estimates accurate.</p>
+      <div class="row"><button class="sm primary" data-wt="log">Log weight</button></div>`;
+    return;
+  }
+  const last = all[all.length - 1], prev = all[all.length - 2], first = all[0];
+  const due = wtTime(last) < wk, since = new Date(wtTime(first)).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+  const recent = all.filter(e => wtTime(e) >= Date.now() - 183 * DAY), chartList = recent.length >= 2 ? recent : all.slice(-2);
+  box.innerHTML = `<div class="wtnow"><b>${wtFmt(last.kg)}</b><span class="muted">on ${fmtDate(wtTime(last))}</span></div>
+    ${prev ? `<p>${wtChange(last.kg - prev.kg)} since the weigh-in before${all.length > 2 ? `, ${wtChange(last.kg - first.kg).toLowerCase()} since ${since}` : ''}.</p>` : ''}
+    ${due ? '<p class="wtdue">Time for this week’s weigh-in.</p>' : ''}
+    ${all.length >= 2 ? `<div class="chart">${wtChart(chartList)}</div>` : '<p class="muted">Your graph appears after your second weigh-in.</p>'}
+    <div class="row"><button class="sm${due ? ' primary' : ''}" data-wt="log">Log weight</button><button class="sm" data-wt="list">All weigh-ins</button></div>`;
+}
+function openWeight(showList){
+  const d = $('#wtDlg'), u = wtUnit(), last = weighIns().slice(-1)[0], today = isoDay(Date.now());
+  const kg0 = last ? last.kg : settings.weight || null, lb0 = kg0 ? kg0 * LB : null;
+  const inputs = u === 'st'
+    ? `<div class="wtst"><label class="f"><span>Stone</span><input type="number" inputmode="numeric" id="wtSt" min="4" max="40" step="1" value="${lb0 ? Math.floor(lb0 / 14) : ''}"></label>
+       <label class="f"><span>Pounds</span><input type="number" inputmode="decimal" id="wtLb" min="0" max="13.9" step="0.1" value="${lb0 ? (Math.round((lb0 % 14) * 10) / 10) : ''}"></label></div>`
+    : `<label class="f"><span>Weight (${u})</span><input type="number" inputmode="decimal" id="wtVal" step="0.1" value="${kg0 ? (u === 'kg' ? kg0 : kg0 * LB).toFixed(1) : ''}"></label>`;
+  const list = weighIns().slice().reverse();
+  d.innerHTML = `<h3>Log your weight</h3>
+    <div class="seg" id="wtUnits" role="group" aria-label="Units">${[['kg', 'kg'], ['st', 'st & lb'], ['lb', 'lb']].map(([k, l]) => `<button data-u="${k}" aria-pressed="${k === u}">${l}</button>`).join('')}</div>
+    <div class="fg" style="margin-top:.7rem">${inputs}<label class="f"><span>Date</span><input type="date" id="wtDate" max="${today}" value="${today}"></label></div>
+    <p class="fhint">Weigh yourself at the same time of day each week, for example first thing on a Monday, for the fairest comparison. A second weigh-in on the same day replaces the first.</p>
+    <p class="err" id="wtErr"></p>
+    <button class="sm primary" id="wtSave">Save weigh-in</button>
+    <details class="sect" data-sect="wtlist"${showList ? ' open' : ''}><summary>All weigh-ins<span class="count">${list.length}</span></summary><div class="sbody">
+      <ul class="hollist">${list.length ? list.map(e => `<li><span>${fmtDate(wtTime(e))}: <strong>${wtFmt(e.kg)}</strong></span><button class="link danger-link" data-wtdel="${esc(e.d)}">Remove</button></li>`).join('') : '<li class="muted">No weigh-ins yet.</li>'}</ul>
+    </div></details>
+    <div class="drow"><span></span><button id="wtClose">Done</button></div>`;
+  d.querySelector('#wtUnits').onclick = e => { const b = e.target.closest('button[data-u]'); if (!b) return; settings.wtUnit = b.dataset.u; saveSettings(); openWeight(d.querySelector('details').open); renderWeight(); renderPcard(); };
+  d.querySelector('#wtSave').onclick = () => {
+    let kg;
+    if (u === 'st'){ const st = parseFloat(d.querySelector('#wtSt').value) || 0, lb = parseFloat(d.querySelector('#wtLb').value) || 0; kg = (st * 14 + lb) / LB; }
+    else { const v = parseFloat(d.querySelector('#wtVal').value); kg = u === 'kg' ? v : v / LB; }
+    const day = d.querySelector('#wtDate').value || today;
+    if (!(kg >= 30 && kg <= 250)){ d.querySelector('#wtErr').textContent = 'That weight doesn’t look right. Please check it.'; return; }
+    if (day > today){ d.querySelector('#wtErr').textContent = 'The date can’t be in the future.'; return; }
+    saveWeighIn(day, Math.round(kg * 10) / 10);
+    d.close(); toast(`Weigh-in saved: ${wtFmt(kg)}`);
+  };
+  d.querySelectorAll('[data-wtdel]').forEach(b => b.onclick = () => {
+    if (!confirm('Remove this weigh-in?')) return;
+    settings.weighIns = weighIns().filter(e => e.d !== b.dataset.wtdel); syncWeightSetting(); saveSettings();
+    openWeight(true); renderWeight(); renderPcard();
+  });
+  d.querySelector('#wtClose').onclick = () => d.close();
+  if (!d.open) d.showModal();
+}
+function saveWeighIn(day, kg){
+  settings.weighIns = weighIns().filter(e => e.d !== day).concat({ d: day, kg });
+  syncWeightSetting(); saveSettings();
+  renderWeight(); renderPcard(); renderLive();
+}
+// the newest weigh-in is the weight used for calorie estimates
+function syncWeightSetting(){ const last = weighIns().slice(-1)[0]; if (last) settings.weight = last.kg; }
+
 function renderPcard(){
   const me = curProfile(), runs = allRuns(), first = runs.length ? Math.min(...runs.map(r => r.date)) : null;
   const h = parseHeight(settings.height), age = ageOf(settings.dob), g = { male: 'Male', female: 'Female', other: 'Other' }[settings.gender];
   const { got } = computeBadges(profiles.current), nb = BADGES.filter(b => got[b.id]).length, golds = myMedals(profiles.current).filter(m => m.place === 0).length;
   const st = computeStreak(runs);
   const hTxt = h ? (isMi() ? `${Math.floor(h / 30.48)}'${Math.round((h / 2.54) % 12)}"` : `${Math.round(h)} cm`) : '';
-  const pills = [hTxt, settings.weight ? `${+settings.weight} kg` : '', age ? `${age} years` : '', g || ''].filter(Boolean).map(t => `<span class="ppill">${t}</span>`).join('');
+  const pills = [hTxt, settings.weight ? wtFmt(+settings.weight) : '', age ? `${age} years` : '', g || ''].filter(Boolean).map(t => `<span class="ppill">${t}</span>`).join('');
   const dist = runs.reduce((a, r) => a + r.dist, 0), time = runs.reduce((a, r) => a + r.moving, 0);
   $('#pcard').innerHTML = `<div class="pc-banner"><button class="sm pc-edit" id="pcEdit">Edit</button></div><div class="pc-top"><span class="pav pc-av${me.photo ? ' has-photo' : ''}" aria-hidden="true">${avatarInner(me)}</span>
       <div class="pc-name"><strong>${esc(me.name)}</strong><span class="muted">${first ? `Running since ${new Date(first).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })}` : 'No runs yet'}</span></div>
@@ -4402,7 +4530,7 @@ function openPEdit(){
   d.showModal();
 }
 function renderHistory(){
-  renderPcard(); showPsub(psub); renderBadges();
+  renderPcard(); showPsub(psub); renderBadges(); renderWeight();
   { const st = computeStreak(allRuns()); refreshStreak(st); renderStreakBox(st); }
   $('#bkNagH').innerHTML = backupDue() ? backupNag() : '';
   const runs = allRuns();
@@ -4789,6 +4917,7 @@ function renderSettings(){
   $('#setConfettiSound').checked = settings.confettiSound;
   $$('#exportSeg button').forEach(b => b.setAttribute('aria-pressed', b.dataset.x === settings.autoExport));
   $('#setSummary').checked = settings.weeklySummary;
+  $('#setWtTrack').checked = wtOn();
   $$('#themeSeg button').forEach(b => b.setAttribute('aria-pressed', b.dataset.th === settings.theme));
   $('#confettiLabel').textContent = `Confetti explosion on each ${isMi() ? 'mile' : 'kilometre'}`;
   $('#controlStatus').textContent = controlStatusText();
@@ -4971,9 +5100,12 @@ $('#glMute').addEventListener('click', e => {
   toast(settings.muted ? 'Audio muted' : 'Audio on');
 });
 $('#setSummary').onchange = e => { settings.weeklySummary = e.target.checked; saveSettings(); };
+// turning it off only hides weight tracking; weigh-ins are kept, so turning it back on brings them back
+$('#setWtTrack').onchange = e => { settings.wtTrack = e.target.checked; saveSettings(); renderWeight(); toast(e.target.checked ? 'Weight tracking on' : 'Weight tracking off. Your weigh-ins are kept.'); };
 $('#themeSeg').addEventListener('click', e => { const b = e.target.closest('button[data-th]'); if (b){ settings.theme = b.dataset.th; saveSettings(); applyTheme(); renderSettings(); } });
 $('#lastWeekBtn').onclick = () => { const ws = weekStart(Date.now()); ws.setDate(ws.getDate() - 7); openSummary(ws); };
 $('#lastMonthBtn').onclick = () => openMonthly(1);
+$('#wtBox').addEventListener('click', e => { const b = e.target.closest('[data-wt]'); if (b) openWeight(b.dataset.wt === 'list'); });
 const MONKEY = 'tm-month-shown-v1';
 function openMonthly(off = 1){
   const now = new Date(), ms = new Date(now.getFullYear(), now.getMonth() - off, 1).getTime(), me = new Date(now.getFullYear(), now.getMonth() - off + 1, 1).getTime(), ps = new Date(now.getFullYear(), now.getMonth() - off - 1, 1).getTime();
@@ -5007,6 +5139,7 @@ function openMonthly(off = 1){
     ${newB.length ? `<h4>Badges earned</h4><div class="mbadges">${newB.map(b => `<span class="mbadge"><span class="bdisc ${b.tier}"><span>${b.icon}</span></span>${esc(b.name)}</span>`).join('')}</div>` : ''}
     ${pbs.length ? `<h4>New personal bests</h4><ul class="sumlist">${pbs.map(x => `<li>${esc(x)}</li>`).join('')}</ul>` : ''}`
     : '<p class="muted">No runs logged that month.</p>'}
+    ${wtReportLine(ms, me, 'this month')}
     <div class="drow"><span><button class="sm" id="monPrev">‹ Earlier</button>${off > 1 ? ' <button class="sm" id="monNext">Later ›</button>' : ''}</span><button class="sm primary" id="sumClose">Close</button></div>`;
   d.querySelector('#monPrev').onclick = () => openMonthly(off + 1);
   if (off > 1) d.querySelector('#monNext').onclick = () => openMonthly(off - 1);
