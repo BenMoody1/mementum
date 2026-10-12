@@ -11,7 +11,17 @@
   var P = 'MeMentumHealth';
   var call = function (m, o) { return C.nativePromise(P, m, o || {}); };
   var SYNCED = 'mm-hc-synced-v1';   // run IDs already sent, per profile
-  var app = null;
+  var PREFS = 'mm-hc-v1';           // on/off, start date, steps: per profile and per device (never synced)
+  var app = null, H = null;
+  function loadPrefs() {
+    H = app.store.get(PREFS, null);
+    if (H) return;
+    var s = app.settings;   // earlier versions kept these in the shared settings
+    H = { on: !!s.hcSync, since: s.hcSince || 0, steps: !!s.hcSteps };
+    if ('hcSync' in s || 'hcSince' in s || 'hcSteps' in s) { delete s.hcSync; delete s.hcSince; delete s.hcSteps; app.saveSettings(); }
+    savePrefs();
+  }
+  function savePrefs() { app.store.set(PREFS, H); }
 
   function synced() { return new Set(app.store.get(SYNCED, [])); }
   function markSynced(ids, add) {
@@ -42,7 +52,7 @@
     function next() {
       if (i >= runs.length) return Promise.resolve(total);
       var batch = runs.slice(i, i + 15); i += 15;
-      return call('writeRuns', { runs: batch.map(payload), includeSteps: !!app.settings.hcSteps }).then(function (r) {
+      return call('writeRuns', { runs: batch.map(payload), includeSteps: !!H.steps }).then(function (r) {
         var failed = (r && r.failed) || [];
         total.written += (r && r.written) || 0;
         total.failed = total.failed.concat(failed);
@@ -54,7 +64,7 @@
   }
 
   function onSaved(rec) {
-    if (!app || !app.settings.hcSync) return;
+    if (!app || !H.on) return;
     send([rec]).then(function (r) {
       if (r.written) setTimeout(function () { app.toast('Sent to Health Connect'); }, 2200);
     }).catch(function (e) {
@@ -68,11 +78,15 @@
   }
 
   // Quietly catch up on runs saved while sync was on but the write failed (no permission, phone busy).
+  // Also removes runs that were deleted on another device (household sync).
   function catchUp() {
-    if (!app.settings.hcSync) return;
-    var done = synced(), since = app.settings.hcSince || 0;
-    var todo = app.runs().filter(function (r) { return r.date >= since && !done.has(r.id); });
+    if (!H.on) return;
+    var done = synced(), since = H.since || 0, runs = app.runs();
+    var todo = runs.filter(function (r) { return r.date >= since && !done.has(r.id); });
     if (todo.length) send(todo).catch(function () {});
+    var ids = new Set(runs.map(function (r) { return r.id; }));
+    var gone = Array.from(done).filter(function (id) { return !ids.has(id); });
+    if (gone.length) call('deleteRuns', { ids: gone }).then(function () { markSynced(gone, false); }).catch(function () {});
   }
 
   /* ---------- Settings section ---------- */
@@ -98,22 +112,22 @@
     ui.open = document.getElementById('hcOpen');
 
     ui.on.addEventListener('change', function () {
-      if (!ui.on.checked) { app.settings.hcSync = false; app.saveSettings(); render(); return; }
+      if (!ui.on.checked) { H.on = false; savePrefs(); render(); return; }
       ui.on.checked = false;
       call('requestAccess').then(function (st) {
         if (st.granted.indexOf('session') < 0) { app.toast('Health Connect access wasn’t allowed'); render(st); return; }
-        app.settings.hcSync = true;
-        if (!app.settings.hcSince) app.settings.hcSince = Date.now();
-        app.saveSettings(); render(st);
+        H.on = true;
+        if (!H.since) H.since = Date.now();
+        savePrefs(); render(st);
         app.toast('Health Connect is on. New runs will be sent automatically.');
       }).catch(function (e) { app.toast((e && e.message) || 'Couldn’t open Health Connect'); });
     });
     ui.steps.addEventListener('change', function () {
-      if (ui.steps.checked && app.settings.hcSync) {
+      if (ui.steps.checked && H.on) {
         // steps may need a permission that was skipped the first time
         call('status').then(function (st) { if (st.granted.indexOf('steps') < 0) return call('requestAccess'); }).then(function () { render(); }).catch(function () {});
       }
-      app.settings.hcSteps = ui.steps.checked; app.saveSettings();
+      H.steps = ui.steps.checked; savePrefs();
     });
     ui.all.addEventListener('click', function () {
       var runs = app.runs();
@@ -134,13 +148,13 @@
     if (!ui.status) return;
     var p = st ? Promise.resolve(st) : call('status');
     p.then(function (s) {
-      var on = !!app.settings.hcSync && s.granted.indexOf('session') >= 0;
-      ui.on.checked = on; ui.steps.checked = !!app.settings.hcSteps;
+      var on = !!H.on && s.granted.indexOf('session') >= 0;
+      ui.on.checked = on; ui.steps.checked = !!H.steps;
       ui.on.disabled = s.available !== 'available';
       ui.steps.disabled = ui.all.disabled = !on;
       if (s.available === 'unavailable') ui.status.textContent = 'Health Connect isn’t available on this phone.';
       else if (s.available === 'update_required') { ui.status.textContent = 'Health Connect needs installing or updating. Tap Open Health Connect.'; }
-      else if (app.settings.hcSync && !on) ui.status.textContent = 'Sync is on, but Health Connect permission was removed. Turn it off and on again to fix it.';
+      else if (H.on && !on) ui.status.textContent = 'Sync is on, but Health Connect permission was removed. Turn it off and on again to fix it.';
       else if (on) ui.status.textContent = 'On for ' + app.profileName() + '. ' + synced().size + ' runs sent so far.';
       else ui.status.textContent = 'Off. Turn on to send ' + app.profileName() + '’s runs to Google Health.';
     }).catch(function () { ui.status.textContent = 'Couldn’t check Health Connect.'; });
@@ -148,6 +162,7 @@
 
   function start() {
     app = window.mmApp;
+    loadPrefs();
     buildUi();
     setTimeout(catchUp, 3000);
   }

@@ -9,6 +9,7 @@
 <link rel="icon" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-192.png">
 <link href="fonts/fonts.css" rel="stylesheet">
+<script src="sync.js"></script>
 <script src="native.js"></script>
 <script src="health.js"></script>
 <script src="notify.js"></script>
@@ -1061,14 +1062,16 @@ function bigGet(sk, d){
   return bigCache.has(sk) ? bigCache.get(sk) : d;
 }
 function bigSet(sk, v){
-  if (!idb){ try { localStorage.setItem(sk, JSON.stringify(v)); return true; } catch(e){ return false; } }
+  if (!idb){ try { localStorage.setItem(sk, JSON.stringify(v)); if (window.mmSync) mmSync.bigChanged(sk); return true; } catch(e){ return false; } }
   bigCache.set(sk, v);
+  if (window.mmSync) mmSync.bigChanged(sk);
   idbPending = idbPending.then(() => idbPut(sk, v)).then(ok => { if (!ok) setTimeout(() => toast('Couldn’t save to phone storage. Back up your runs.'), 0); });
   return true;
 }
 function bigDel(sk){
-  if (!idb){ try { localStorage.removeItem(sk); } catch(e){} return; }
+  if (!idb){ try { localStorage.removeItem(sk); } catch(e){} if (window.mmSync) mmSync.bigChanged(sk); return; }
   bigCache.delete(sk); idbPending = idbPending.then(() => idbPut(sk, undefined));
+  if (window.mmSync) mmSync.bigChanged(sk);
 }
 const store = {
   get(k, d){ if (isBig(k)) return bigGet(scoped(k), d); try { const v = localStorage.getItem(scoped(k)); return v ? JSON.parse(v) : d; } catch(e){ return d; } },
@@ -1080,6 +1083,8 @@ const keyFor = (base, id) => id === 'default' ? base : `${base}@${id}`;
 function rawGet(base, id, d){ const k = keyFor(base, id); if (isBig(base)) return bigGet(k, d); try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch(e){ return d; } }
 function rawSet(base, id, v){ const k = keyFor(base, id); if (isBig(base)) return bigSet(k, v); try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch(e){ return false; } }
 await bigStoreInit();
+// household sync: fetch other devices' changes before the app reads anything
+if (window.mmSync) await mmSync.boot({ bigGet, bigSet, bigDel, keyFor, profiles, saveProfiles, flush: () => idbPending });
 const settings = Object.assign({ glControls: true, freeTarget: 'none', ghost: true, confettiTheme: 'classic', voice: 'auto', height: null, muted: false, confettiSound: true, autoExport: 'off',  units: 'km', weight: null, maxHr: null, weeklyGoal: 0, announce: true, cues: true, control: false, theme: 'auto', weeklySummary: true, goalSet: false, unitsSet: false, setupDone: store.get(KEY, []).length > 0, confetti: !window.matchMedia('(prefers-reduced-motion: reduce)').matches }, store.get(SKEY, {}));
 // older versions defaulted the goal to 20 km without it ever being set; treat that as not set
 if (!settings.goalSet && settings.weeklyGoal === 20000) settings.weeklyGoal = 0;

@@ -15,12 +15,19 @@
   var STREAK_BASE = 1001, WEEKLY_ID = 1101, DAY = 86400000;
   var app = null, S = null;
 
+  // Notification choices belong to this device (and profile), so they're kept out of synced settings.
+  var PREFS = 'mm-notify-v1', N = null;
   function defaults() {
-    if (S.nStreak === undefined) S.nStreak = false;
-    if (!S.nStreakAt) S.nStreakAt = '19:00';
-    if (S.nWeekly === undefined) S.nWeekly = false;
-    if (S.nRun === undefined) S.nRun = true;
+    N = app.store.get(PREFS, null);
+    if (!N) {
+      N = { nStreak: !!S.nStreak, nStreakAt: S.nStreakAt || '19:00', nWeekly: !!S.nWeekly, nRun: S.nRun !== false };
+      if (['nStreak', 'nStreakAt', 'nWeekly', 'nRun'].some(function (k) { return k in S; })) {
+        delete S.nStreak; delete S.nStreakAt; delete S.nWeekly; delete S.nRun; app.saveSettings();
+      }
+      savePrefs();
+    }
   }
+  function savePrefs() { app.store.set(PREFS, N); }
   var many = function () { return app.profiles.list.length > 1; };
   var who = function () { return many() ? app.profileName() + '’s ' : 'Your '; };
   var mi = function () { return S.units === 'mi'; };
@@ -44,7 +51,7 @@
     var st = app.computeStreak(app.allRuns()), now = Date.now(), out = [];
     if (!st.current && !st.todayActive) return out;      // no streak to protect
     for (var i = 0; i < 7; i++) {
-      var when = at(i, S.nStreakAt);
+      var when = at(i, N.nStreakAt);
       if (when.getTime() <= now + 60000) continue;
       if (st.holiday && st.holiday.has(app.dayKey(when.getTime()))) continue;
       if (i === 0) {
@@ -90,8 +97,8 @@
     call(LN, 'cancel', { notifications: ids.map(function (id) { return { id: id }; }) }).catch(function () {})
       .then(function () {
         var list = [];
-        if (S.nStreak) list = list.concat(streakNotes());
-        if (S.nWeekly) { var w = weeklyNote(); if (w) list.push(w); }
+        if (N.nStreak) list = list.concat(streakNotes());
+        if (N.nWeekly) { var w = weeklyNote(); if (w) list.push(w); }
         if (list.length) return call(LN, 'schedule', { notifications: list });
       })
       .catch(function (e) { console.warn('Couldn’t book reminders', e); })
@@ -114,7 +121,7 @@
   }
   function loop() {
     var r = app.liveRun(), active = !!(r && !r.demo);
-    if (active && S.nRun !== false) {
+    if (active && N.nRun !== false) {
       var o = { title: 'Run in progress', text: runText(r) };
       if (!svc) { if (document.visibilityState === 'visible') { svc = true; call(RUN, 'start', o).catch(function () { svc = false; }); } }
       else call(RUN, 'update', o).catch(function () {});
@@ -136,22 +143,22 @@
       '<p class="fhint">The run notification keeps the treadmill and heart rate connected if the screen turns off or you switch apps. Reminders follow whichever profile was last used on this phone.</p></div>';
     anchor.parentNode.insertBefore(t.content, anchor);
     var $ = function (id) { return document.getElementById(id); };
-    $('nStreak').checked = !!S.nStreak; $('nStreakAt').value = S.nStreakAt;
-    $('nWeekly').checked = !!S.nWeekly; $('nRun').checked = S.nRun !== false;
+    $('nStreak').checked = !!N.nStreak; $('nStreakAt').value = N.nStreakAt;
+    $('nWeekly').checked = !!N.nWeekly; $('nRun').checked = N.nRun !== false;
     ['nStreak', 'nWeekly'].forEach(function (id) {
       $(id).addEventListener('change', function () {
         var box = $(id);
-        if (!box.checked) { S[id] = false; app.saveSettings(); reschedule(); return; }
+        if (!box.checked) { N[id] = false; savePrefs(); reschedule(); return; }
         allowed().then(function (ok) {
           if (!ok) { box.checked = false; app.toast('Notifications are blocked. Allow them in Android Settings > Apps > MeMentum.'); return; }
-          S[id] = true; app.saveSettings(); reschedule(); app.toast('Reminders on');
+          N[id] = true; savePrefs(); reschedule(); app.toast('Reminders on');
         });
       });
     });
-    $('nStreakAt').addEventListener('change', function () { if ($('nStreakAt').value) { S.nStreakAt = $('nStreakAt').value; app.saveSettings(); reschedule(); } });
+    $('nStreakAt').addEventListener('change', function () { if ($('nStreakAt').value) { N.nStreakAt = $('nStreakAt').value; savePrefs(); reschedule(); } });
     $('nRun').addEventListener('change', function () {
-      S.nRun = $('nRun').checked; app.saveSettings();
-      if (S.nRun) allowed();
+      N.nRun = $('nRun').checked; savePrefs();
+      if (N.nRun) allowed();
     });
   }
 
