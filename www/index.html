@@ -157,6 +157,10 @@ ul.runs button{width:100%;display:grid;grid-template-columns:1fr auto;align-item
 .wsum{font-size:.88rem;color:var(--muted)}
 .wsel{font-size:.82rem;font-weight:600;color:var(--infield)}
 .wedit{display:flex;gap:1.2rem;padding:0 0 .6rem .8rem}
+.witem{position:relative}
+.witem.hasstar .wpick{padding-right:3.2rem}
+.wstar{position:absolute;top:.25rem;right:0;width:2.9rem;height:2.9rem;min-height:0;padding:0;border:none;background:none;font-size:1.45rem;line-height:1;color:var(--muted)}
+.wstar[aria-pressed="true"]{color:#e0a100}
 
 .field{display:flex;flex-direction:column;gap:.3rem;margin:1rem 0}
 .flabel{font-weight:600}
@@ -726,6 +730,7 @@ body.picking{overflow:hidden}
 <section class="tab" id="tab-workouts" hidden>
   <h2>Workouts</h2>
   <div class="selcard" id="selCard"></div>
+  <div id="woTop"></div>
   <div id="planBox"></div>
   <div id="wlist"></div>
 </section>
@@ -1476,7 +1481,7 @@ const BASE_CELEBS = [
 const CELEB_MAP = {
   first: ['fountain', 'glock', ['⭐'], 0], d5: ['burst', 'brass', ['5️⃣'], 2], d10: ['fireworks', 'brass', ['🔟'], 4], d21: ['fireworks', 'brass', ['🏅', '✨'], 5], d42: ['fireworks', 'brass', ['🏆', '🎆', '✨'], 7],
   k5_30: ['shooting', 'synth', ['⚡'], 0], k5_25: ['shooting', 'synth', ['💨'], 3], k5_20: ['shooting', 'synth', ['🌩️', '⚡'], 6], k10_60: ['fountain', 'brass', ['🔥'], 1], k10_50: ['shooting', 'harp', ['☄️', '✨'], 5],
-  mi8: ['burst', 'pizz', ['🥕'], 2], mi7: ['shooting', 'pizz', ['💨'], 4], k1_4: ['shooting', 'synth', ['🏁'], 7],
+  mi8: ['burst', 'pizz', ['🥕'], 2], mi7: ['shooting', 'pizz', ['💨'], 4],
   t50: ['spiral', 'marimba', ['🛣️'], 0], t100: ['spiral', 'brass', ['💯'], 2], t250: ['spiral', 'harp', ['🧭', '🗺️'], 4], t500: ['balloons', 'synth', ['🚀', '🌙'], 5], t1000: ['spiral', 'harp', ['🌍', '🌎', '🌏'], 7],
   c10: ['burst', 'marimba', ['🔁'], 0], c25: ['balloons', 'marimba', ['🎈'], 3], c50: ['balloons', 'brass', ['🎉', '🎈'], 5], c100: ['fireworks', 'harp', ['💎', '✨'], 8],
   h1: ['spiral', 'glock', ['⏱️'], 1], th10: ['snow', 'chimes', ['⌛'], 3], th50: ['snow', 'chimes', ['🕰️'], 6],
@@ -2612,22 +2617,43 @@ function renderWorkouts(){
     <span class="wsum">${sw ? esc(summary(sw)) : 'No targets. Just run.'}</span>${sw ? `<span class="wdur">Takes ${durLabel(sw).toLowerCase()}</span>` : ''}
     ${sw ? `<div class="tl">${workoutTimeline(sw, null)}</div>` : ''}
     <p class="fhint" style="margin:.5rem 0 0">Start the belt and the steps change automatically, with spoken cues.</p>`;
+  const favs = new Set(favWorkoutIds());
+  const star = w => { const on = favs.has(w.id);
+    return `<button class="wstar" data-fav="${esc(w.id)}" aria-pressed="${on}" aria-label="${on ? 'Remove from' : 'Add to'} favourites: ${esc(w.name)}">${on ? '★' : '☆'}</button>`; };
   const item = (w, isCustom) => {
     const id = w ? w.id : '', sel = (selected || '') === id;
-    return `<li class="witem${sel ? ' sel' : ''}"><button class="wpick" data-pick="${esc(id)}">
+    return `<li class="witem${sel ? ' sel' : ''}${w ? ' hasstar' : ''}">${w ? star(w) : ''}<button class="wpick" data-pick="${esc(id)}">
       <span class="wname">${w ? esc(w.name) : 'Free run'}</span>
       <span class="wsum">${w ? esc(summary(w)) : 'No targets. Just run.'}</span>${w ? `<span class="wdur">Takes ${durLabel(w).toLowerCase()}</span>` : ''}
       ${sel ? '<span class="wsel">Selected</span>' : ''}</button>
       ${isCustom ? `<div class="wedit"><button class="link" data-edit="${esc(id)}">Edit</button><button class="link" data-del="${esc(id)}">Delete</button></div>`
         : w && w.preset ? `<div class="wedit"><button class="link" data-edit="${esc(id)}">Edit</button>${w.edited ? `<button class="link" data-preset-reset="${esc(id)}">Reset to original</button>` : ''}</div>` : ''}</li>`;
   };
+  // Free run is the most-used choice, so it sits at the top, always visible
+  // then Favourites, in the order they were starred (anything deleted since is skipped)
+  const customIds = new Set(custom.map(w => w.id)), favList = favWorkoutIds().map(getWorkout);
+  $('#woTop').innerHTML = `<ul class="wlist">${item(null)}</ul>`
+    + sect('fav', 'Favourites', favList.length, true, favList.length
+      ? `<ul class="wlist">${favList.map(w => item(w, customIds.has(w.id))).join('')}</ul>`
+      : '<p class="muted">Tap the ☆ beside any workout to keep it here.</p>');
   $('#wlist').innerHTML =
-    sect('ready', 'Ready-made workouts', PRESETS.length + 1, false, `<ul class="wlist">${item(null)}${presetList().map(w => item(w)).join('')}</ul>`)
+    sect('ready', 'Ready-made workouts', PRESETS.length, false, `<ul class="wlist">${presetList().map(w => item(w)).join('')}</ul>`)
     + sect('custom', 'Your workouts', custom.length, false,
       (custom.length ? `<ul class="wlist">${custom.map(w => item(w, true)).join('')}</ul>` : '<p class="muted">Build your own interval or goal-pace session.</p>')
       + '<button class="primary" id="newWo">Create workout</button>');
   renderPlan();
   renderSetup();
+}
+// favourites live in the profile's settings, so they sync with it. Only ids that still exist count.
+const favWorkoutIds = () => (Array.isArray(settings.favWorkouts) ? settings.favWorkouts : [])
+  .filter((id, i, a) => a.indexOf(id) === i && !String(id).startsWith('plan:') && getWorkout(id));
+function toggleFav(id){
+  const w = getWorkout(id); if (!w) return;
+  const list = (Array.isArray(settings.favWorkouts) ? settings.favWorkouts : []).filter(x => x !== id), on = !(settings.favWorkouts || []).includes(id);
+  if (on) list.push(id);
+  settings.favWorkouts = list; saveSettings();
+  renderWorkouts();
+  toast(on ? `${w.name} added to favourites` : `${w.name} removed from favourites`);
 }
 function pickWorkout(id){
   selected = id || null; store.set(SELKEY, selected);
@@ -3242,6 +3268,7 @@ function gtSnap(now){
 }
 function finishCelebrate(){ // called when a workout completes
   if (run) run.doneAt = { t: run.moving, d: run.dist };
+  GT.afterRun = run ? run.start : null; GT.afterAt = performance.now();   // starts the 10-second wait before the rolling view
   if (isDemo && demo){ demo.manual = true; demo.target = demo.speed; } // keep the current speed
   GT.finishAt = performance.now();
   if (glanceOpen()) GT.pendingCeleb = true;           // fires when the marker breaks the ribbon
@@ -3549,11 +3576,71 @@ function freeTimeline(){
 }
 const toRecordLite = () => ({ splitsKm: run.splitsKm, splitsMi: run.splitsMi });
 
+/* ---------- after the finish line ----------
+ * 10 seconds after a workout or free-run target is finished, the ribbon and flags clear and the strip
+ * follows the runner instead: real speed as bars, real incline as hills, one bar per 30 seconds over the
+ * last 10 minutes. The marker settles near the right edge and the run (and a small finish flag) scrolls
+ * off to the left. The bar you're on shows the belt's speed and incline straight away, so changes appear
+ * as you make them. Nothing is scheduled: it's worked out from the clock on every redraw, so finishing
+ * or saving the run simply ends it. The workoutDone / freeDone flags and the celebration are untouched. */
+const AF_SPAN = 600, AF_SEG = 30, AF_DELAY = 10000;
+function afterFinishDue(){
+  if (!run || !(wo ? wo.done : run.freeDone)) return false;
+  if (GT.afterRun !== run.start) return true;   // finished before the app reopened: go straight to the rolling view
+  return performance.now() - GT.afterAt >= AF_DELAY;
+}
+function afterFinishTimeline(){
+  gtLayout();
+  const now = performance.now(), me = curProfile(), t = run.moving, d = run.dist, doneT = run.doneAt ? run.doneAt.t : null;
+  const W = GTW - 2, x0 = Math.max(0, t - AF_SPAN * .85), xOf = v => (v - x0) / AF_SPAN * W, segW = AF_SEG / AF_SPAN * W;
+  const buckets = new Map();
+  run.samples.forEach(q => { if (q[0] == null) return; const i = Math.floor(Math.max(0, q[0] - 1e-6) / AF_SEG); if ((i + 1) * AF_SEG < x0) return;
+    const b = buckets.get(i) || { n: 0, s: 0, inc: 0 }; b.n++; b.s += q[1]; b.inc += q[2]; buckets.set(i, b); });
+  const lastI = Math.floor(Math.max(0, t - 1e-6) / AF_SEG), bars = [];
+  for (let i = Math.floor(x0 / AF_SEG); i <= lastI; i++){
+    const b = buckets.get(i), fill = Math.min(1, (t - i * AF_SEG) / AF_SEG);
+    if (i === lastI) bars.push({ i, s: live.speed || 0, inc: live.incline || 0, fill });
+    else if (b) bars.push({ i, s: b.s / b.n, inc: b.inc / b.n, fill });
+  }
+  const avg = t > 0 ? d / t * 3.6 : 0, maxS = Math.max(14, ...bars.map(b => b.s)), hy = inc => (GMT + GMH - GMH * Math.min(11, Math.max(0, inc)) / 11).toFixed(1);
+  let svg = `<svg viewBox="0 0 ${GTW} ${GH}" role="img" aria-label="Your speed and incline, scrolling along with you">`;
+  if (bars.length){
+    const pts = [`M${xOf(bars[0].i * AF_SEG).toFixed(1)} ${GMT + GMH}`];
+    bars.forEach(b => pts.push(`L${(xOf(b.i * AF_SEG) + segW * b.fill / 2).toFixed(1)} ${hy(b.inc)}`));
+    const lb = bars[bars.length - 1], ex = xOf(lb.i * AF_SEG) + segW * lb.fill;
+    pts.push(`L${ex.toFixed(1)} ${hy(lb.inc)} L${ex.toFixed(1)} ${GMT + GMH} Z`);
+    svg += `<path d="${pts.join(' ')}" fill="#FBF6EE" fill-opacity=".22" stroke="#FBF6EE" stroke-opacity=".55" stroke-width="1.2" stroke-linejoin="round"/>`;
+  }
+  bars.forEach(b => {
+    const x = xOf(b.i * AF_SEG), w = segW * b.fill, h = Math.max(2, GBH * b.s / maxS), e = b.s < avg * .97 ? 'easy' : b.s > avg * 1.03 ? 'hard' : 'steady';
+    svg += `<rect x="${(x + .6).toFixed(1)}" y="${(GBASE - h).toFixed(1)}" width="${Math.max(.6, w - 1.2).toFixed(1)}" height="${h.toFixed(1)}" rx="1.5" fill="${EFF_COL[e]}"${e === 'hard' ? ' stroke="#FBF6EE" stroke-width="1"' : ''}/>`;
+    if (glSel === b.i) svg += `<rect x="${(x - .4).toFixed(1)}" y="${GAY + 14}" width="${(segW + .8).toFixed(1)}" height="${GMT + GMH - GAY - 12}" rx="3" class="gselbox"/>`;
+    svg += `<rect x="${x.toFixed(1)}" y="0" width="${segW.toFixed(1)}" height="${GH}" class="hit" data-step="${b.i}"/>`;
+  });
+  svg += `<line x1="0" x2="${GTW}" y1="${GBASE + .5}" y2="${GBASE + .5}" stroke="#FBF6EE" stroke-opacity=".35"/>`;
+  // where you finished: a small chequered flag that scrolls away with the rest of the run
+  if (doneT != null){ const fx = xOf(doneT);
+    if (fx > -20 && fx < W) svg += `<line x1="${fx.toFixed(1)}" x2="${fx.toFixed(1)}" y1="${GBT - 14}" y2="${GMT + GMH}" stroke="#FBF6EE" stroke-opacity=".7" stroke-dasharray="2 2"/>${gtFlag(fx + 1, GBT - 14, now, 0)}`; }
+  // your marker, with the time since the finish
+  const mx = Math.max(13, xOf(t)), R = 11.5, X = mx.toFixed(1);
+  svg += `<line x1="${X}" x2="${X}" y1="${GAY + R}" y2="${GMT + GMH}" class="gmark"/><circle cx="${X}" cy="${GAY}" r="${R}" fill="none" stroke="#FBF6EE" stroke-width="3"/>`;
+  svg += avatarSvg(me, +X, GAY, 9.5, 'glAvClip', 1);
+  if (doneT != null){ const tx = mx + 56 > W ? mx - 34 : mx + 34;
+    svg += `<rect x="${(tx - 24).toFixed(1)}" y="${GAY - 9}" width="48" height="18" rx="9" fill="#FBF6EE"/><text x="${tx.toFixed(1)}" y="${GAY + 4}" text-anchor="middle" class="gtag">+${esc(fmtTime(Math.max(0, t - doneT)))}</text>`; }
+  svg += `<text x="${GTW - 2}" y="10" text-anchor="end" class="geta">${esc(`${fD(d)} ${dU()}, ${fmtTime(t)}`)}</text><text x="2" y="10" class="geta" opacity=".85">Past the finish</text>`;
+  svg += '</svg>';
+  let info;
+  const sb = glSel != null && bars.find(b => b.i === glSel);
+  if (sb && now - glSelTs < 5000) info = `${fmtTime(sb.i * AF_SEG)} to ${fmtTime((sb.i + 1) * AF_SEG)}: ${speedText(sb.s)}, ${fP(3600 / Math.max(.1, sb.s))} /${dU()}, ${sb.inc.toFixed(0)}% incline`;
+  else { if (glSel != null && now - glSelTs >= 5000) glSel = null; info = `Now: ${speedText(live.speed)}, ${fP(paceFromSpeed(live.speed))} /${dU()}, ${(live.incline || 0).toFixed(0)}% incline`; }
+  return { svg, info };
+}
+
 // draw the timeline (also called every animation frame while the glance view is open)
 let glTlLast = 0, glRaf = 0;
 function drawGlTimeline(){
   const gw = getWorkout(selected) || (wo && wo.def);
-  const t = gw ? glanceTimeline(gw) : freeTimeline();
+  const t = afterFinishDue() ? afterFinishTimeline() : gw ? glanceTimeline(gw) : freeTimeline();
   $('#glTlSvg').innerHTML = t.svg;
   if ($('#glTlInfo').textContent !== t.info) $('#glTlInfo').textContent = t.info;
   if (glTlMax) $('#glTlSvg svg').style.maxHeight = glTlMax + 'px';
@@ -4010,7 +4097,6 @@ const BADGES = [
   ['k10_50', '10K under 50', 'Run 10 km in under 50 minutes', 'gold', '☄️'],
   ['mi8', 'Mile under 8', 'Run a mile in under 8 minutes', 'bronze', '🐇'],
   ['mi7', 'Mile under 7', 'Run a mile in under 7 minutes', 'silver', '🐆'],
-  ['k1_4', 'Speed demon', 'Run 1 km in under 4 minutes', 'gold', '🏎️'],
   ['t50', '50 km total', 'Run 50 km in total', 'bronze', '🛣️'],
   ['t100', 'Century', 'Run 100 km in total', 'silver', '💯'],
   ['t250', '250 km total', 'Run 250 km in total', 'silver', '🧭'],
@@ -4077,7 +4163,7 @@ function computeBadges(pid, extra = []){
     if (r.dist >= 5000) earn('d5', d); if (r.dist >= 10000) earn('d10', d); if (r.dist >= 21097) earn('d21', d); if (r.dist >= 42195) earn('d42', d);
     if (best['5k'] < 1800) earn('k5_30', d); if (best['5k'] < 1500) earn('k5_25', d); if (best['5k'] < 1200) earn('k5_20', d);
     if (best['10k'] < 3600) earn('k10_60', d); if (best['10k'] < 3000) earn('k10_50', d);
-    if (best['1mi'] < 480) earn('mi8', d); if (best['1mi'] < 420) earn('mi7', d); if (best['1k'] < 240) earn('k1_4', d);
+    if (best['1mi'] < 480) earn('mi8', d); if (best['1mi'] < 420) earn('mi7', d);
     [[50, 't50'], [100, 't100'], [250, 't250'], [500, 't500'], [1000, 't1000']].forEach(([km, id]) => { if (tDist >= km * 1000) earn(id, d); });
     [[10, 'c10'], [25, 'c25'], [50, 'c50'], [100, 'c100']].forEach(([n, id]) => { if (nRuns >= n) earn(id, d); });
     if (r.moving >= 3600) earn('h1', d); if (tTime >= 36000) earn('th10', d); if (tTime >= 180000) earn('th50', d);
@@ -4121,7 +4207,7 @@ function computeBadges(pid, extra = []){
     h1: [maxTime / 3600], th10: [tTime / 36000], th50: [tTime / 180000], climb100: [maxClimb / 100], everest: [tClimb / 8849, `${Math.round(tClimb)} of 8,849 m`],
     steps10k: [maxSteps / 10000], wo10: [nWo / 10, `${nWo} of 10`], pod5: [pods / 5, `${pods} of 5`], gold5: [golds / 5, `${golds} of 5`],
     k5_30: [0, bestTxt('5k', '5 km')], k5_25: [0, bestTxt('5k', '5 km')], k5_20: [0, bestTxt('5k', '5 km')], k10_60: [0, bestTxt('10k', '10 km')], k10_50: [0, bestTxt('10k', '10 km')],
-    mi8: [0, bestTxt('1mi', 'mile')], mi7: [0, bestTxt('1mi', 'mile')], k1_4: [0, bestTxt('1k', '1 km')]
+    mi8: [0, bestTxt('1mi', 'mile')], mi7: [0, bestTxt('1mi', 'mile')]
   });
   ['t50', 't100', 't250', 't500', 't1000'].forEach(id => prog[id][1] = `${fD(tDist, 0)} of ${fD({ t50: 5e4, t100: 1e5, t250: 2.5e5, t500: 5e5, t1000: 1e6 }[id], 0)} ${dU()}`);
   const stk = computeStreak(runs, undefined, pid);
@@ -4148,7 +4234,7 @@ function computeBadges(pid, extra = []){
 const BADGE_GROUPS = [
   ['Getting started', ['first', 'twoday', 'explorer', 'week3', 'early', 'night']],
   ['In one run', ['d5', 'd10', 'd21', 'd42', 'h1', 'steps10k', 'climb100']],
-  ['Speed', ['mi8', 'k5_30', 'mi7', 'k5_25', 'k10_60', 'k5_20', 'k10_50', 'k1_4']],
+  ['Speed', ['mi8', 'k5_30', 'mi7', 'k5_25', 'k10_60', 'k5_20', 'k10_50']],
   ['Distance and time', ['t50', 't100', 't250', 't500', 't1000', 'th10', 'th50', 'everest']],
   ['Run count', ['c10', 'c25', 'c50', 'c100']],
   ['Streaks and habits', ['day7', 'comeback', 'perfectweek', 'day30', 'day100', 'day365', 'streak4', 'streak12', 'goal4']],
@@ -4766,8 +4852,10 @@ $('#inUp').onclick = () => nudgeIncline(1);
 $('#inDown').onclick = () => nudgeIncline(-1);
 $('#stopBelt').onclick = stopBelt;
 
-$('#wlist').addEventListener('click', e => {
+function woListClick(e){
   if (e.target.closest('#newWo')){ openStepBuilder(null); return; }
+  const fv = e.target.closest('[data-fav]');
+  if (fv){ toggleFav(fv.dataset.fav); return; }
   const p = e.target.closest('[data-pick]'), ed = e.target.closest('[data-edit]'), del = e.target.closest('[data-del]');
   if (ed){ const w = getWorkout(ed.dataset.edit); w.kind === 'goal' ? openBuilder(w) : openStepBuilder(w); return; }
   const pr = e.target.closest('[data-preset-reset]');
@@ -4782,10 +4870,13 @@ $('#wlist').addEventListener('click', e => {
     if (!w || !confirm(`Delete “${w.name}”?`)) return;
     store.set(WKEY, customWorkouts().filter(x => x.id !== w.id));
     if (selected === w.id){ selected = null; store.set(SELKEY, null); }
+    if ((settings.favWorkouts || []).includes(w.id)){ settings.favWorkouts = settings.favWorkouts.filter(x => x !== w.id); saveSettings(); }
     renderWorkouts(); renderRunWorkout(); return;
   }
   if (p) pickWorkout(p.dataset.pick);
-});
+}
+$('#wlist').addEventListener('click', woListClick);
+$('#woTop').addEventListener('click', woListClick);
 $('#tmChip').onclick = $('#hrChip').onclick = $('#connOpen').onclick = () => $('#connDlg').showModal();
 $('#connClose').onclick = () => $('#connDlg').close();
 $('#profBtn').onclick = $('#manageProf').onclick = openProfiles;
