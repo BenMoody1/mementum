@@ -32,7 +32,9 @@
   --paper:#111714; --surface:#1A221E; --ink:#E4EAE5; --muted:#95A29A; --rule:#2E3833;
   --track:#C0443A; --infield:#62B07F; --warn:#E0B060;
 }
-*,*::before,*::after{box-sizing:inherit}
+/* border-box set directly: inherit breaks inside <details>, whose built-in wrapper is content-box,
+   so rows in the Workouts sections grew wider than the screen and pushed the tab bar off the bottom */
+*,*::before,*::after{box-sizing:border-box}
 html{scroll-padding-top:env(safe-area-inset-top,0px)}
 body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--body);font-size:1rem;line-height:1.45;-webkit-font-smoothing:antialiased}
 header.bar{max-width:40rem;margin:0 auto;padding:1rem 1rem .5rem}
@@ -165,7 +167,7 @@ ul.runs button{width:100%;display:grid;grid-template-columns:1fr auto;align-item
 .field{display:flex;flex-direction:column;gap:.3rem;margin:1rem 0}
 .flabel{font-weight:600}
 .fhint{font-size:.88rem;color:var(--muted);margin:.2rem 0 .5rem}
-input[type=number],input[type=text],select,textarea{font:inherit;color:var(--ink);background:var(--paper);border:1.5px solid var(--rule);border-radius:10px;min-height:44px;padding:.4rem .6rem;width:100%}
+input[type=number],input[type=text],input[type=date],select,textarea{font:inherit;color:var(--ink);background:var(--paper);border:1.5px solid var(--rule);border-radius:10px;min-height:44px;padding:.4rem .6rem;width:100%}
 textarea{min-height:5rem;resize:vertical}
 input:focus-visible,select:focus-visible,textarea:focus-visible{outline:3px solid var(--infield);outline-offset:1px}
 .check{display:flex;gap:.6rem;align-items:flex-start;margin:.6rem 0}
@@ -543,8 +545,13 @@ nav.tabs button{padding:0 .15rem;font-size:.86rem}
 .wtbox .wtnow b{font-family:var(--num);font-weight:600;font-size:1.9rem;line-height:1}
 .wtbox p{margin:.25rem 0}
 .wtdue{font-weight:600;color:var(--track)}
-.wtst{display:flex;gap:.5rem;align-items:center}
-.wtst input{width:5rem}
+/* Stone and Pounds share a full row, so Date drops to its own row instead of overlapping */
+.wtst{grid-column:1 / -1;display:grid;grid-template-columns:1fr 1fr;gap:.6rem}
+.wtst input,.fg input{min-width:0}
+.wtdate{grid-column:span 2}
+input[type=date]{color-scheme:light}
+:root[data-theme="dark"] input[type=date]{color-scheme:dark}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) input[type=date]{color-scheme:dark}}
 .hollist li{display:flex;justify-content:space-between;align-items:center;gap:.5rem;padding:.45rem 0;border-bottom:1px solid var(--rule)}
 .cal-d.today{box-shadow:0 0 0 2px var(--ink)}
 .cal-d.fut{color:var(--rule)}
@@ -2676,13 +2683,18 @@ const openSects = new Set(), touchedSects = new Set();
 const sectOpen = (id, def) => touchedSects.has(id) ? openSects.has(id) : def;
 document.addEventListener('toggle', e => {
   const d = e.target;
-  if (d && d.dataset && d.dataset.sect){ touchedSects.add(d.dataset.sect); if (d.open) openSects.add(d.dataset.sect); else openSects.delete(d.dataset.sect); }
+  if (d && d.dataset && d.dataset.sect){ touchedSects.add(d.dataset.sect); if (d.open) openSects.add(d.dataset.sect); else openSects.delete(d.dataset.sect); if (d.dataset.sect === 'plan') syncSelCard(); }
 }, true);
 const sect = (id, title, count, defOpen, body) => `<details class="sect" data-sect="${id}"${sectOpen(id, defOpen) ? ' open' : ''}><summary>${title}<span class="count">${count}</span></summary><div class="sbody">${body}</div></details>`;
+// the top card is hidden when the plan's next session is selected, as the plan shows it, unless the plan is collapsed
+function syncSelCard(){
+  const ap = activePlan();
+  $('#selCard').hidden = !!(ap && sectOpen('plan', true) && String(selected).startsWith('plan:') && nextPlanIndex(ap) === +String(selected).slice(5));
+}
 function renderWorkouts(){
   const custom = customWorkouts(), sw = getWorkout(selected);
   const ap = activePlan();
-  $('#selCard').hidden = !!(ap && String(selected).startsWith('plan:') && nextPlanIndex(ap) === +String(selected).slice(5));
+  syncSelCard();
   $('#selCard').innerHTML = `<span class="muted">Selected for your next run</span><strong>${sw ? esc(sw.name) : 'Free run'}</strong>
     <span class="wsum">${sw ? esc(summary(sw)) : 'No targets. Just run.'}</span>${sw ? `<span class="wdur">Takes ${durLabel(sw).toLowerCase()}</span>` : ''}
     ${sw ? `<div class="tl">${workoutTimeline(sw, null)}</div>` : ''}
@@ -3092,8 +3104,8 @@ function renderPlan(){
       <span>${esc(s.title)}<br><span class="wsum">${esc(summary(s.def))}</span> <span class="wdur">${durLabel(s.def)}</span></span>
       <button class="link" data-ptoggle="${i}" aria-label="${plan.done[i] ? 'Undo' : 'Mark done'}: ${esc(s.title)}">${plan.done[i] ? 'Undo' : 'Mark done'}</button></div>`).join('');
   }
-  box.innerHTML = `<div class="plan">
-    <span class="muted">Training plan</span>
+  // the active plan sits in its own collapsible section, open by default, showing progress in the header
+  box.innerHTML = sect('plan', 'Training plan', `${doneN}/${list.length}`, true, `<div class="plan">
     <h3>${esc(def.name)}</h3>
     <div class="prog"><i style="width:${(doneN / list.length * 100).toFixed(1)}%"></i></div>
     <p class="muted" style="margin:0">${doneN} of ${list.length} sessions done${next != null ? `, now in week ${list[next].week} of ${def.weeks}` : ''}</p>
@@ -3101,7 +3113,7 @@ function renderPlan(){
       <button class="sm${isSel ? '' : ' primary'}" data-pnext="${next}">${isSel ? 'Selected for your next run' : 'Use for my next run'}</button>` : '<p><strong>Plan complete.</strong> Brilliant work.</p>'}
     <details class="sect" data-sect="psess"${sectOpen('psess', false) ? ' open' : ''}><summary>All sessions<span class="count">${list.length}</span></summary><div class="sbody">${weeks}</div></details>
     <div class="row" style="margin-top:.8rem"><button class="sm" id="planPaces">Update paces</button><button class="sm danger" id="planEnd">End plan</button></div>
-  </div>`;
+  </div>`);
 }
 function openPlanDialog(id, existing){
   const pl = PLANS.find(x => x.id === id), d = $('#builder'), jog = pl.input === 'jog', p = existing ? existing.paces : null;
@@ -4529,7 +4541,7 @@ function openWeight(showList){
   const list = weighIns().slice().reverse();
   d.innerHTML = `<h3>Log your weight</h3>
     <div class="seg" id="wtUnits" role="group" aria-label="Units">${[['kg', 'kg'], ['st', 'st & lb'], ['lb', 'lb']].map(([k, l]) => `<button data-u="${k}" aria-pressed="${k === u}">${l}</button>`).join('')}</div>
-    <div class="fg" style="margin-top:.7rem">${inputs}<label class="f"><span>Date</span><input type="date" id="wtDate" max="${today}" value="${today}"></label></div>
+    <div class="fg" style="margin-top:.7rem">${inputs}<label class="f wtdate"><span>Date</span><input type="date" id="wtDate" max="${today}" value="${today}"></label></div>
     <p class="fhint">Weigh yourself at the same time of day each week, for example first thing on a Monday, for the fairest comparison. A second weigh-in on the same day replaces the first.</p>
     <p class="err" id="wtErr"></p>
     <button class="sm primary" id="wtSave">Save weigh-in</button>
