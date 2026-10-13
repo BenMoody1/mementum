@@ -997,6 +997,8 @@ const $$ = s => [...document.querySelectorAll(s)];
 
 /* ---------- constants ---------- */
 const FTMS = 0x1826, TREADMILL_DATA = 0x2acd, FEATURE = 0x2acc, SPEED_RANGE = 0x2ad4, INCLINE_RANGE = 0x2ad5, CONTROL_POINT = 0x2ad9;
+// PitPat walking pads (e.g. Superun, shows as PitPat-T01) use their own protocol instead of FTMS
+const PITPAT = '0000fba0-0000-1000-8000-00805f9b34fb', PP_WRITE = '0000fba1-0000-1000-8000-00805f9b34fb', PP_NOTIFY = '0000fba2-0000-1000-8000-00805f9b34fb';
 const PROFKEY = 'tm-profiles-v1';
 const KEY = 'tm-runs-v1', DRAFT = 'tm-draft-v1', SKEY = 'tm-settings-v1', WKEY = 'tm-workouts-v1', SELKEY = 'tm-selected-v1', DEVKEY = 'tm-devices-v1';
 const PKEY = 'tm-plan-v1', SUMKEY = 'tm-summary-week-v1';
@@ -1122,11 +1124,12 @@ const HRDEVKEY = 'tm-hrdev-v1';
 let tmDev = null, ch = null, tmConnecting = false, tmManual = false, tmReconnecting = false;
 let hrDev = null, hrCh = null, hrConnecting = false, hrManual = false, hrReconnecting = false;
 let cpCh = null, cpWait = null, cpQueue = Promise.resolve();
+let pp = null; // PitPat link when the treadmill is a PitPat pad: { write, queue }
 const freshCtrl = () => ({ speed: false, incline: false, ok: false, granted: false, speedRange: [1, 18, 0.1], inclineRange: [0, 12, 1] });
 let ctrl = freshCtrl();
 let isDemo = false, demo = null;
 let live = { speed: 0, incline: 0, hr: null, hrTs: 0 };
-let run = null, lastTs = null, lastDist = null, lastKcal = null, tmDist = false;
+let run = null, lastTs = null, lastDist = null, lastKcal = null, tmDist = false, lastSteps = null;
 let needStop = false;
 let ctrlTarget = { sp: null, spTs: 0, inc: null, inTs: 0 };
 let wo = null, wakeLock = null, chartMode = 'week', filterTag = null;
@@ -1939,12 +1942,48 @@ function parseTreadmill(dv){
   return r;
 }
 
+/* ---------- PitPat parsing and commands ---------- */
+// Protocol from the open-source PitPat-WebBT project. Every status message must be answered,
+// with a queued command or a heartbeat, or the pad drops the connection.
+const PP_HEARTBEAT = [0x6a, 0x05, 0xfd, 0xf8, 0x43];
+function parsePitPat(dv){
+  if (dv.byteLength < 31) return {};
+  const u16 = o => dv.getUint16(o, false), u32 = o => dv.getUint32(o, false);
+  const flags = dv.getUint8(26), k = (flags & 0x80) ? 1.609344 : 1; // pad set to miles
+  const running = (flags & 0x18) === 0x08;
+  return { speed: running ? u16(3) / 1000 * k : 0, dist: u32(7) * k, steps: u32(14), kcal: u16(18) };
+}
+function ppPacket(type, kmh = 1){
+  const sp = Math.round(Math.min(6, Math.max(1, kmh)) * 1000), a = new Array(23).fill(0);
+  a[0] = 0x6a; a[1] = 0x17; a[6] = (sp >> 8) & 255; a[7] = sp & 255;
+  a[8] = type === 'speed' ? 5 : 1; a[10] = 80; // fixed value the pad is known to accept
+  a[12] = type === 'pause' ? 2 : type === 'stop' ? 0 : 4;
+  let id = 58965456623n;
+  for (let i = 7; i >= 0; i--){ a[13 + i] = Number(id & 255n); id >>= 8n; }
+  let x = 0; for (let i = 1; i <= 20; i++) x ^= a[i];
+  a[21] = x; a[22] = 0x43;
+  return { type, bytes: a };
+}
+function ppQueue(cmd){
+  if (!pp) return false;
+  const last = pp.queue[pp.queue.length - 1];
+  if (last && last.type === 'speed' && cmd.type === 'speed') pp.queue[pp.queue.length - 1] = cmd; // newest speed wins
+  else pp.queue.push(cmd);
+  return true;
+}
+function onPpValue(e){
+  onData(parsePitPat(e.target.value));
+  if (!pp) return;
+  const cmd = pp.queue.shift();
+  pp.write.writeValue(new Uint8Array(cmd ? cmd.bytes : PP_HEARTBEAT)).catch(() => { if (cmd && pp) pp.queue.unshift(cmd); });
+}
+
 /* ---------- run recording ---------- */
 function startRun(){
   run = { start: Date.now(), moving: 0, dist: 0, climb: 0, maxSpeed: 0, incSum: 0, kcal: 0, hasKcal: false, kcalEst: 0, steps: 0,
           hrSum: 0, hrT: 0, hrMax: 0, zones: [0, 0, 0, 0, 0], splitsKm: [], splitsMi: [], samples: [], track: [[0, 0]],
           lastSample: -5, demo: isDemo, workoutName: null, workoutKind: null };
-  lastDist = null; lastKcal = null; tmDist = false;
+  lastDist = null; lastKcal = null; tmDist = false; lastSteps = null;
   requestWake();
   run.freeTarget = getWorkout(selected) ? null : (settings.freeTarget || 'none'); run.freeDone = false;
   if (getWorkout(selected)) beginWorkout();
@@ -1979,7 +2018,10 @@ function onData(r, now = performance.now()){
       { const kpm = kcalRate(); if (kpm) run.kcalEst += kpm * dt / 60; }
     }
     run.dist += d;
-    if (settings.height && d > 0) run.steps += d / stepLength(Math.max(live.speed, 3));
+    if (r.steps != null){ // pads that count steps themselves
+      if (lastSteps != null){ const ds = r.steps - lastSteps; if (ds >= 0 && ds < 100) run.steps += ds; }
+      lastSteps = r.steps; run.tmSteps = true;
+    } else if (!run.tmSteps && settings.height && d > 0) run.steps += d / stepLength(Math.max(live.speed, 3));
     if (d > 0) run.track.push([run.moving, run.dist]);
     if (live.incline > 0) run.climb += d * live.incline / 100;
     run.maxSpeed = Math.max(run.maxSpeed, live.speed);
@@ -2028,8 +2070,8 @@ function toRecord(r){
     avgHr: r.hrT ? Math.round(r.hrSum / r.hrT) : null, maxHr: r.hrMax || null,
     zones: r.hrT && r.zones.some(z => z > 0) ? r.zones.map(Math.round) : null,
     splitsKm: r.splitsKm.map(Math.round), splitsMi: r.splitsMi.map(Math.round),
-    steps: settings.height ? Math.round(r.steps) : null,
-    cadence: settings.height && r.moving > 30 ? Math.round(r.steps / (r.moving / 60)) : null,
+    steps: settings.height || r.tmSteps ? Math.round(r.steps) : null,
+    cadence: (settings.height || r.tmSteps) && r.moving > 30 ? Math.round(r.steps / (r.moving / 60)) : null,
     samples: r.samples, best: bestEfforts(r.track),
     workout: r.workoutName, workoutId: wo ? wo.def.id : null, workoutDone: !!(wo && wo.done), freeTarget: r.freeTarget || null, freeDone: !!r.freeDone, tags: r.workoutKind === 'int' ? ['Intervals'] : [], note: ''
   };
@@ -2258,6 +2300,7 @@ async function cpCommand(bytes){
 }
 async function setSpeed(kmh){
   if (isDemo){ demo.manual = true; demo.target = Math.max(0, Math.min(20, kmh)); return true; }
+  if (pp){ if (live.speed <= MOVING) return false; return ppQueue(ppPacket('speed', Math.round(kmh * 10) / 10)); }
   if (!cpCh || live.speed <= MOVING) return false;
   const [mn, mx, inc] = ctrl.speedRange;
   kmh = Math.min(mx, Math.max(mn, Math.round(kmh / inc) * inc));
@@ -2265,7 +2308,7 @@ async function setSpeed(kmh){
 }
 async function setIncline(p){
   if (isDemo){ demo.manual = true; demo.incline = Math.max(0, Math.min(12, p)); return true; }
-  if (!cpCh) return false;
+  if (pp || !cpCh) return false;
   const [mn, mx, inc] = ctrl.inclineRange;
   p = Math.min(mx, Math.max(mn, Math.round(p / inc) * inc));
   return cpCommand([0x03, ...i16(Math.round(p * 10))]);
@@ -2288,6 +2331,7 @@ async function gradualStop(secs = 10){
 }
 async function stopBelt(){
   if (isDemo){ demo.manual = true; demo.target = 0; return; }
+  if (pp){ ppQueue(ppPacket('stop')); return; }
   if (!cpCh){ toast('Use the stop button on the treadmill'); return; }
   const ok = await cpCommand([0x08, 0x01]);
   if (!ok) toast('The treadmill didn’t accept the stop command. Use its stop button.');
@@ -2308,11 +2352,11 @@ async function connectTreadmill(showAll){
   let d;
   try {
     d = await navigator.bluetooth.requestDevice(showAll
-      ? { acceptAllDevices: true, optionalServices: [FTMS] }
-      : { filters: [{ services: [FTMS] }], optionalServices: [FTMS] });
+      ? { acceptAllDevices: true, optionalServices: [FTMS, PITPAT] }
+      : { filters: [{ services: [FTMS] }, { services: [PITPAT] }], optionalServices: [FTMS, PITPAT] });
   } catch(e){
     if (e.name === 'SecurityError') showMsg('Chrome blocked Bluetooth on this page. Open the file directly in Chrome rather than inside another app.');
-    else if (e.name === 'NotFoundError') showMsg('No treadmill selected. If it wasn’t listed, close Zwift, Kinomap and adidas Console+, check the Bluetooth stick is plugged into the treadmill, then try “Show all nearby devices”.');
+    else if (e.name === 'NotFoundError') showMsg('No treadmill selected. If it wasn’t listed, close Zwift, Kinomap, adidas Console+ and PitPat, check the Bluetooth stick is plugged into the treadmill, then try “Show all nearby devices”.');
     else showMsg('Couldn’t open the device list: ' + e.message);
     return;
   }
@@ -2329,22 +2373,37 @@ async function openTreadmill(quiet){
   tmManual = false; tmConnecting = true; renderConn();
   try {
     const server = await withTimeout(dev.gatt.connect(), 15000);
-    let svc;
-    try { svc = await server.getPrimaryService(FTMS); } catch(e){ throw new Error('NOFTMS'); }
-    const c = await svc.getCharacteristic(TREADMILL_DATA);
-    if (my !== tmAttempt) throw new Error('replaced');
-    c.removeEventListener('characteristicvaluechanged', onTmValue);
-    c.addEventListener('characteristicvaluechanged', onTmValue);
-    await c.startNotifications();
-    if (my !== tmAttempt) throw new Error('replaced');
-    ch = c;
-    await setupControl(svc);
+    let svc = null, ppSvc = null;
+    try { svc = await server.getPrimaryService(FTMS); } catch(e){}
+    if (!svc){ try { ppSvc = await server.getPrimaryService(PITPAT); } catch(e){ throw new Error('NOFTMS'); } }
+    if (svc){
+      const c = await svc.getCharacteristic(TREADMILL_DATA);
+      if (my !== tmAttempt) throw new Error('replaced');
+      c.removeEventListener('characteristicvaluechanged', onPpValue);
+      c.removeEventListener('characteristicvaluechanged', onTmValue);
+      c.addEventListener('characteristicvaluechanged', onTmValue);
+      await c.startNotifications();
+      if (my !== tmAttempt) throw new Error('replaced');
+      pp = null; ch = c;
+      await setupControl(svc);
+    } else {
+      const w = await ppSvc.getCharacteristic(PP_WRITE), c = await ppSvc.getCharacteristic(PP_NOTIFY);
+      if (my !== tmAttempt) throw new Error('replaced');
+      pp = { write: w, queue: [] };
+      c.removeEventListener('characteristicvaluechanged', onTmValue);
+      c.removeEventListener('characteristicvaluechanged', onPpValue);
+      c.addEventListener('characteristicvaluechanged', onPpValue);
+      await c.startNotifications();
+      if (my !== tmAttempt) throw new Error('replaced');
+      ch = c; cpCh = null;
+      ctrl = { ...freshCtrl(), speed: true, ok: true, granted: true, speedRange: [1, 6, 0.1], inclineRange: [0, 0, 1] };
+    }
     lastTs = null; rememberDevice('tm', dev);
     if (!quiet && $('#connDlg').open) setTimeout(() => { if (ch) $('#connDlg').close(); }, 800);
     if (!quiet) showMsg('');
   } catch(e){
     if (my !== tmAttempt){ try { if (dev !== tmDev) dev.gatt.disconnect(); } catch(_){} return; }
-    ch = null; cpCh = null;
+    ch = null; cpCh = null; pp = null;
     if (!quiet){
       if (e.message === 'NOFTMS') showMsg('Connected, but this device doesn’t send standard treadmill data. Make sure you picked the treadmill.');
       else showMsg('Couldn’t connect: ' + e.message + '. Close any other app using the treadmill and try again. If it keeps failing, tap Choose to pick it again.');
@@ -2355,7 +2414,7 @@ async function openTreadmill(quiet){
 }
 
 async function onTmDisconnect(){
-  ch = null; cpCh = null; ctrl.granted = false; lastTs = null; live.speed = 0;
+  ch = null; cpCh = null; pp = null; ctrl.granted = false; lastTs = null; live.speed = 0;
   renderConn(); renderLive();
   if (tmManual || tmReconnecting) return;
   tmReconnecting = true;
@@ -2371,7 +2430,7 @@ async function onTmDisconnect(){
 function disconnectTreadmill(){
   tmManual = true;
   try { tmDev && tmDev.gatt.connected && tmDev.gatt.disconnect(); } catch(e){}
-  ch = null; cpCh = null; renderConn(); renderLive();
+  ch = null; cpCh = null; pp = null; renderConn(); renderLive();
 }
 
 /* ---------- heart rate connection ---------- */
@@ -4502,6 +4561,17 @@ function saveWeighIn(day, kg){
   syncWeightSetting(); saveSettings();
   renderWeight(); renderPcard(); renderLive();
 }
+// weigh-ins from Health Connect (health.js): [{ d, kg }], one per day. Like a manual entry, a weigh-in
+// on a day that already has one replaces it. Saves once, however many arrive.
+function addWeighIns(list){
+  list = (list || []).filter(e => e && /^\d{4}-\d\d-\d\d$/.test(e.d) && e.kg >= 30 && e.kg <= 250);
+  if (!list.length) return 0;
+  const days = new Set(list.map(e => e.d));
+  settings.weighIns = weighIns().filter(e => !days.has(e.d)).concat(list.map(e => ({ d: e.d, kg: Math.round(e.kg * 10) / 10 })));
+  syncWeightSetting(); saveSettings();
+  renderWeight(); renderPcard(); renderLive();
+  return list.length;
+}
 // the newest weigh-in is the weight used for calorie estimates
 function syncWeightSetting(){ const last = weighIns().slice(-1)[0]; if (last) settings.weight = last.kg; }
 
@@ -4893,6 +4963,7 @@ function restore(file){
 function controlStatusText(){
   if (isDemo) return 'Demo treadmill: control is simulated, so you can try it here.';
   if (!ch) return 'Connect your treadmill to check whether it accepts control.';
+  if (pp) return 'Your walking pad accepts speed control from 1 to 6 km/h. It has no incline.';
   if (!cpCh) return 'Your treadmill doesn’t offer remote control over Bluetooth. Workouts will tell you what to set instead.';
   return `Your treadmill reports speed control ${ctrl.speed ? 'supported' : 'not supported'}, incline control ${ctrl.incline ? 'supported' : 'not supported'}.`;
 }
@@ -4959,6 +5030,7 @@ const speedStep = () => isMi() ? 0.5 * 1.609344 : 0.5;
 // repeated taps build on the last requested target, not the belt's current (still ramping) speed
 const recent = ts => performance.now() - ts < 4000;
 function nudgeSpeed(sign){
+  if (pp && live.speed <= MOVING && sign > 0){ ppQueue(ppPacket('start', 2)); toast('Starting the belt at 2 km/h'); return; } // PitPat pads can be started from the app
   if (live.speed <= MOVING && !isDemo){ toast('Start the belt on the treadmill first'); return; }
   const base = ctrlTarget.sp != null && recent(ctrlTarget.spTs) ? ctrlTarget.sp : live.speed;
   const [mn, mx] = isDemo ? [0, 20] : ctrl.speedRange;
@@ -5330,7 +5402,7 @@ $('#testAudio').onclick = () => { audio(); beep(990, .25); setTimeout(() => say(
 $('#testControl').onclick = async () => {
   if (isDemo){ $('#controlStatus').textContent = 'Demo treadmill: control works. Try the speed buttons on the Run tab.'; return; }
   if (!ch){ $('#controlStatus').textContent = 'Connect your treadmill first.'; return; }
-  if (!cpCh){ $('#controlStatus').textContent = controlStatusText(); return; }
+  if (pp || !cpCh){ $('#controlStatus').textContent = controlStatusText(); return; }
   $('#controlStatus').textContent = 'Asking the treadmill for control…';
   const g = await cpSend([0x00]); ctrl.granted = g === 1;
   $('#controlStatus').textContent = ctrl.granted
@@ -5413,7 +5485,8 @@ document.addEventListener('click', e => {
 });
 // hand a few things to health.js and notify.js (Android app only)
 window.mmApp = { settings, saveSettings, store, toast, runs: () => store.get(KEY, []), profileName: () => curProfile().name,
-  liveRun: () => run, live: () => live, computeStreak, allRuns, profileRuns, weekStart, dayKey, profiles };
+  liveRun: () => run, live: () => live, computeStreak, allRuns, profileRuns, weekStart, dayKey, profiles,
+  addWeighIns, wtFmt: kg => wtFmt(kg), fmtDate: t => fmtDate(t) };
 window.dispatchEvent(new Event('mmapp-ready'));
 })();
 </script>

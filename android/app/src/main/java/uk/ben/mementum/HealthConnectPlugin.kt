@@ -16,8 +16,11 @@ import androidx.health.connect.client.records.HeartRateRecord
 import androidx.health.connect.client.records.Record
 import androidx.health.connect.client.records.SpeedRecord
 import androidx.health.connect.client.records.StepsRecord
+import androidx.health.connect.client.records.WeightRecord
 import androidx.health.connect.client.records.metadata.Device
 import androidx.health.connect.client.records.metadata.Metadata
+import androidx.health.connect.client.request.ReadRecordsRequest
+import androidx.health.connect.client.time.TimeRangeFilter
 import androidx.health.connect.client.units.Energy
 import androidx.health.connect.client.units.Length
 import androidx.health.connect.client.units.Velocity
@@ -42,6 +45,10 @@ import org.json.JSONObject
  * session plus distance, active calories, heart rate, speed, climb and (optionally) steps.
  * Every record gets a clientRecordId of "mementum-<runId>-<kind>", so writing the same
  * run again updates it instead of creating a duplicate.
+ *
+ * It also reads weigh-ins (from Renpho Health or any other scale app that shares weight with
+ * Health Connect). Weight has its own permission, asked for separately, so turning on weight
+ * import never depends on run sync and the other way round.
  */
 @CapacitorPlugin(name = "MeMentumHealth")
 class HealthConnectPlugin : Plugin() {
@@ -61,6 +68,7 @@ class HealthConnectPlugin : Plugin() {
     )
     private val permissions: Set<String>
         get() = kinds.keys.map { HealthPermission.getWritePermission(it) }.toSet()
+    private val weightPermission = HealthPermission.getReadPermission(WeightRecord::class)
 
     private fun available() = HealthConnectClient.getSdkStatus(context) == HealthConnectClient.SDK_AVAILABLE
     private fun client() = HealthConnectClient.getOrCreate(context)
@@ -95,6 +103,7 @@ class HealthConnectPlugin : Plugin() {
                 val granted = client().permissionController.getGrantedPermissions()
                 val names = JSArray()
                 kinds.forEach { (type, kind) -> if (granted.contains(HealthPermission.getWritePermission(type))) names.put(kind) }
+                if (granted.contains(weightPermission)) names.put("weight")
                 ret.put("granted", names)
                 call.resolve(ret)
             } catch (e: Exception) {
@@ -106,12 +115,14 @@ class HealthConnectPlugin : Plugin() {
     @PluginMethod
     fun requestAccess(call: PluginCall) {
         if (!available()) { call.reject("Health Connect isn't available on this phone"); return }
+        // { weight: true } asks only for reading weight; otherwise the run-writing permissions
+        val wanted = if (call.getBoolean("weight", false) == true) setOf(weightPermission) else permissions
         val l = launcher
         if (l != null) {
             pending = call
-            l.launch(permissions)
+            l.launch(wanted)
         } else {
-            val intent = PermissionController.createRequestPermissionResultContract().createIntent(context, permissions)
+            val intent = PermissionController.createRequestPermissionResultContract().createIntent(context, wanted)
             startActivityForResult(call, intent, "accessResult")
         }
     }
@@ -167,6 +178,53 @@ class HealthConnectPlugin : Plugin() {
                 }
             }
             call.resolve()
+        }
+    }
+
+    /**
+     * Weigh-ins recorded after `since` (ms). Resolves { weights: [{ time, day, kg, source }] },
+     * oldest first. `day` is the local date the weigh-in was taken on (YYYY-MM-DD).
+     * Health Connect only lets an app read back to 30 days before it was first given access.
+     */
+    @PluginMethod
+    fun readWeights(call: PluginCall) {
+        if (!available()) { call.reject("Health Connect isn't available on this phone"); return }
+        val since = Instant.ofEpochMilli(maxOf(0L, call.getLong("since", 0L) ?: 0L))
+        scope.launch {
+            try {
+                if (!client().permissionController.getGrantedPermissions().contains(weightPermission)) {
+                    call.reject("NO_PERMISSION"); return@launch
+                }
+                val out = JSArray()
+                var token: String? = null
+                var pages = 0
+                do {
+                    val res = client().readRecords(ReadRecordsRequest(
+                        recordType = WeightRecord::class,
+                        timeRangeFilter = TimeRangeFilter.after(since),
+                        ascendingOrder = true,
+                        pageSize = 500,
+                        pageToken = token
+                    ))
+                    res.records.forEach { w ->
+                        val zone = w.zoneOffset ?: ZoneId.systemDefault().rules.getOffset(w.time)
+                        val o = JSObject()
+                        o.put("time", w.time.toEpochMilli())
+                        o.put("day", w.time.atOffset(zone).toLocalDate().toString())
+                        o.put("kg", w.weight.inKilograms)
+                        o.put("source", w.metadata.dataOrigin.packageName)
+                        out.put(o)
+                    }
+                    token = res.pageToken
+                    pages++
+                } while (!token.isNullOrEmpty() && pages < 20)
+                val ret = JSObject()
+                ret.put("weights", out)
+                call.resolve(ret)
+            } catch (e: Exception) {
+                Log.e(TAG, "Couldn't read weight", e)
+                call.reject(e.message ?: "Couldn't read weight from Health Connect")
+            }
         }
     }
 

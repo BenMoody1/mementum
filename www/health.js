@@ -1,6 +1,7 @@
 /* MeMentum: Health Connect sync (Android app only).
  * Adds a "Health Connect" section to Settings, sends each finished run to Health Connect,
- * and removes it again if the run is deleted. Sync is switched on per profile, because
+ * and removes it again if the run is deleted. It can also bring in weigh-ins from a smart
+ * scale app (e.g. Renpho Health) whenever the app opens or comes back to the front. Sync is switched on per profile, because
  * Health Connect belongs to the phone's owner, not the whole family.
  */
 (function () {
@@ -11,7 +12,7 @@
   var P = 'MeMentumHealth';
   var call = function (m, o) { return C.nativePromise(P, m, o || {}); };
   var SYNCED = 'mm-hc-synced-v1';   // run IDs already sent, per profile
-  var PREFS = 'mm-hc-v1';           // on/off, start date, steps: per profile and per device (never synced)
+  var PREFS = 'mm-hc-v1';           // on/off, start date, steps, weight import: per profile and per device (never synced)
   var app = null, H = null;
   function loadPrefs() {
     H = app.store.get(PREFS, null);
@@ -89,6 +90,39 @@
     if (gone.length) call('deleteRuns', { ids: gone }).then(function () { markSynced(gone, false); }).catch(function () {});
   }
 
+  /* ---------- Weigh-ins from Health Connect ----------
+   * H.wt: import is on. H.wtSince: time (ms) of the newest weigh-in already imported, so each one
+   * comes in once. Several readings on one day (stepping on twice) count as that day's last one. */
+  var wtBusy = false, wtLastCheck = 0;
+  function importWeights(manual) {
+    if (!H.wt || wtBusy) return Promise.resolve(0);
+    if (!manual && Date.now() - wtLastCheck < 60000) return Promise.resolve(0);
+    wtBusy = true; wtLastCheck = Date.now();
+    return call('readWeights', { since: (H.wtSince || 0) + 1 }).then(function (r) {
+      var list = (r && r.weights) || [], byDay = {}, newest = H.wtSince || 0;
+      list.forEach(function (w) {
+        if (!(w.kg >= 30 && w.kg <= 250) || !/^\d{4}-\d\d-\d\d$/.test(w.day)) return;
+        if (!byDay[w.day] || w.time >= byDay[w.day].time) byDay[w.day] = w;
+        if (w.time > newest) newest = w.time;
+      });
+      var days = Object.keys(byDay).sort();
+      var n = app.addWeighIns(days.map(function (d) { return { d: d, kg: byDay[d].kg }; }));
+      H.wtSince = newest; savePrefs();
+      if (n === 1) app.toast('Weigh-in added from Health Connect: ' + app.wtFmt(byDay[days[0]].kg));
+      else if (n > 1) app.toast(n + ' weigh-ins added from Health Connect');
+      else if (manual) app.toast('No new weigh-ins in Health Connect');
+      return n;
+    }).catch(function (e) {
+      if (manual || /NO_PERMISSION/.test((e && e.message) || ''))
+        app.toast(/NO_PERMISSION/.test((e && e.message) || '') ? 'Weight import needs Health Connect permission again. See Settings.' : 'Couldn’t read weigh-ins from Health Connect');
+      return 0;
+    }).then(function (n) { wtBusy = false; render(); return n; });
+  }
+  // the usual pattern is: weigh in, Renpho syncs, switch back to MeMentum, so check on return too
+  document.addEventListener('visibilitychange', function () {
+    if (document.visibilityState === 'visible' && app) setTimeout(function () { importWeights(false); }, 1500);
+  });
+
   /* ---------- Settings section ---------- */
   var ui = {};
   function el(html) { var t = document.createElement('template'); t.innerHTML = html.trim(); return t.content; }
@@ -104,12 +138,30 @@
       '<label class="check"><input type="checkbox" id="hcSteps"><span>Include steps</span></label>' +
       '<p class="fhint">Each run appears in Google Health and other connected apps as a treadmill run, with distance, calories, heart rate, speed and climb. Only turn this on for the phone owner’s profile. Leave steps off if your watch already counts your steps, so they aren’t counted twice.</p>' +
       '<div class="row"><button class="sm" id="hcSyncAll">Sync past runs</button><button class="sm" id="hcOpen">Open Health Connect</button></div>' +
+      '<label class="check" style="margin-top:1rem"><input type="checkbox" id="hcWt"><span>Bring in weigh-ins from Health Connect</span></label>' +
+      '<p class="fhint" id="hcWtStatus"></p>' +
+      '<p class="fhint">Adds weigh-ins from your smart scale’s app, such as Renpho Health, to this profile’s weight, whenever you open MeMentum. In Renpho Health, turn on Health Connect and allow weight first. Only turn this on for the phone owner’s profile.</p>' +
+      '<div class="row"><button class="sm" id="hcWtNow">Check for weigh-ins now</button></div>' +
       '</div>'), anchor);
     ui.status = document.getElementById('hcStatus');
     ui.on = document.getElementById('hcOn');
     ui.steps = document.getElementById('hcSteps');
     ui.all = document.getElementById('hcSyncAll');
     ui.open = document.getElementById('hcOpen');
+    ui.wt = document.getElementById('hcWt');
+    ui.wtStatus = document.getElementById('hcWtStatus');
+    ui.wtNow = document.getElementById('hcWtNow');
+
+    ui.wt.addEventListener('change', function () {
+      if (!ui.wt.checked) { H.wt = false; savePrefs(); render(); return; }
+      ui.wt.checked = false;
+      call('requestAccess', { weight: true }).then(function (st) {
+        if (st.granted.indexOf('weight') < 0) { app.toast('Health Connect access to weight wasn’t allowed'); render(st); return; }
+        H.wt = true; savePrefs(); render(st);
+        importWeights(true);
+      }).catch(function (e) { app.toast((e && e.message) || 'Couldn’t open Health Connect'); });
+    });
+    ui.wtNow.addEventListener('click', function () { importWeights(true); });
 
     ui.on.addEventListener('change', function () {
       if (!ui.on.checked) { H.on = false; savePrefs(); render(); return; }
@@ -152,6 +204,13 @@
       ui.on.checked = on; ui.steps.checked = !!H.steps;
       ui.on.disabled = s.available !== 'available';
       ui.steps.disabled = ui.all.disabled = !on;
+      var wtOn = !!H.wt && s.granted.indexOf('weight') >= 0;
+      ui.wt.checked = wtOn;
+      ui.wt.disabled = s.available !== 'available';
+      ui.wtNow.disabled = !wtOn || wtBusy;
+      ui.wtStatus.textContent = H.wt && !wtOn && s.available === 'available'
+        ? 'Weight import is on, but Health Connect permission was removed. Turn it off and on again to fix it.'
+        : wtOn ? (H.wtSince ? 'On. Last weigh-in brought in: ' + app.fmtDate(H.wtSince) + '.' : 'On. No weigh-ins found yet.') : '';
       if (s.available === 'unavailable') ui.status.textContent = 'Health Connect isn’t available on this phone.';
       else if (s.available === 'update_required') { ui.status.textContent = 'Health Connect needs installing or updating. Tap Open Health Connect.'; }
       else if (H.on && !on) ui.status.textContent = 'Sync is on, but Health Connect permission was removed. Turn it off and on again to fix it.';
@@ -165,6 +224,7 @@
     loadPrefs();
     buildUi();
     setTimeout(catchUp, 3000);
+    setTimeout(function () { importWeights(false); }, 3500);
   }
   window.mmHealth = { onSaved: onSaved, onDeleted: onDeleted };
   if (window.mmApp) start(); else window.addEventListener('mmapp-ready', start, { once: true });

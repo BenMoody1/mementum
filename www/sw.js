@@ -1,5 +1,5 @@
 // Treadmill log service worker: makes the app open offline and installable.
-const CACHE = 'treadmill-log-v66';
+const CACHE = 'treadmill-log-v67';
 const SHELL = ['./', './index.html', './manifest.json', './icon-192.png', './icon-512.png', './icon-maskable-512.png',
   './sync.js', './native.js', './health.js', './notify.js', './fonts/fonts.css',
   './fonts/barlow-latin-400-normal.woff2', './fonts/barlow-latin-500-normal.woff2', './fonts/barlow-latin-600-normal.woff2',
