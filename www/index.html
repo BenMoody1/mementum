@@ -545,6 +545,14 @@ nav.tabs button{padding:0 .15rem;font-size:.86rem}
 .wtbox .wtnow b{font-family:var(--num);font-weight:600;font-size:1.9rem;line-height:1}
 .wtbox p{margin:.25rem 0}
 .wtdue{font-weight:600;color:var(--track)}
+.wtgoal{margin:.5rem 0}
+.wtgoal .prog{height:10px;border-radius:5px;margin:.2rem 0 .3rem}
+.wtgoal p{margin:0}
+.seg.wtview{margin:.6rem 0 .2rem}
+.seg.wtview button{min-height:36px;padding:0 .9rem;font-size:.9rem}
+.wgline{stroke:var(--infield);stroke-width:1.4;stroke-dasharray:5 3}
+.wglab{fill:var(--infield);font-weight:600}
+.bmiedge{stroke:var(--muted);stroke-width:.8;stroke-dasharray:1 3;opacity:.7}
 /* Stone and Pounds share a full row, so Date drops to its own row instead of overlapping */
 .wtst{grid-column:1 / -1;display:grid;grid-template-columns:1fr 1fr;gap:.6rem}
 .wtst input,.fg input{min-width:0}
@@ -4490,22 +4498,56 @@ function wtPeriod(from, to){
   const before = all.filter(e => wtTime(e) < from), base = before.length ? before[before.length - 1] : inP[0], last = inP[inP.length - 1];
   return { now: last.kg, change: base === last ? null : last.kg - base.kg };
 }
+/* BMI is weight (kg) / height (m) squared, the same sum Renpho uses. Health Connect has no BMI record,
+ * so it's worked out here from each weigh-in and the profile's height. */
+const heightM = () => { const h = parseHeight(settings.height); return h ? h / 100 : null; };
+const bmiOf = kg => { const m = heightM(); return m ? kg / (m * m) : null; };
+const bmiBand = b => b < 18.5 ? 'underweight' : b < 25 ? 'healthy weight' : b < 30 ? 'overweight' : 'obese';
+/* target weight: settings.wtGoal = { kg, from, d }. from is the weight when the target was set, so progress
+ * runs from there to the target. It lives in the profile's settings, so it syncs and backs up with it. */
+function wtGoal(){
+  const g = settings.wtGoal;
+  if (!g || !(g.kg >= 30 && g.kg <= 250)) return null;
+  const first = weighIns()[0];
+  const from = g.from >= 30 ? g.from : first ? first.kg : null;
+  return from ? { kg: g.kg, from, d: g.d } : null;
+}
+function goalProgress(now, g = wtGoal()){
+  if (!g || now == null) return null;
+  const lose = g.kg < g.from, total = Math.abs(g.from - g.kg), done = lose ? g.from - now : now - g.from;
+  const reached = lose ? now <= g.kg + .05 : now >= g.kg - .05;
+  const pct = reached ? 100 : total > 0 ? Math.max(0, Math.min(100, done / total * 100)) : 0;
+  return { lose, reached, pct, left: Math.abs(now - g.kg), goal: g.kg };
+}
+function goalHtml(now, bar = true){
+  const p = goalProgress(now); if (!p) return '';
+  const txt = p.reached ? `🎯 <strong>Target of ${wtFmt(p.goal)} reached.</strong> Brilliant work.`
+    : `🎯 <strong>${wtDiffFmt(p.left)} to ${p.lose ? 'lose' : 'gain'}</strong> to reach your ${wtFmt(p.goal)} target, ${Math.round(p.pct)}% of the way there.`;
+  return `<div class="wtgoal">${bar ? `<div class="prog" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(p.pct)}" aria-label="Progress to target weight"><i style="width:${p.pct.toFixed(1)}%"></i></div>` : ''}<p>${txt}</p></div>`;
+}
 function wtReportLine(from, to, label){
   if (!wtOn()) return '';
   const p = wtPeriod(from, to);
   if (!p) return '';
-  return `<p>⚖️ Weight: ${p.change == null ? `weighed in at <strong>${wtFmt(p.now)}</strong> ${label}.` : `<strong>${wtChange(p.change)}</strong> ${label}, now ${wtFmt(p.now)}.`}</p>`;
+  const b = bmiOf(p.now);
+  return `<p>⚖️ Weight: ${p.change == null ? `weighed in at <strong>${wtFmt(p.now)}</strong> ${label}.` : `<strong>${wtChange(p.change)}</strong> ${label}, now ${wtFmt(p.now)}.`}${b ? ` BMI ${b.toFixed(1)}.` : ''}</p>${goalHtml(p.now)}`;
 }
-function wtChart(list){
-  const W = 320, H = 132, pl = 44, pr = 8, pt = 10, pb = 18, u = wtUnit();
-  const val = kg => u === 'kg' ? kg : kg * LB;
-  let mn = Math.min(...list.map(e => val(e.kg))), mx = Math.max(...list.map(e => val(e.kg)));
-  if (mx - mn < 2){ const m = (mx + mn) / 2; mn = m - 1; mx = m + 1; }
+function wtChart(list, bmi = false){
+  const W = 320, H = 132, pl = 44, pr = 8, pt = 10, pb = 18, u = wtUnit(), g = wtGoal();
+  const val = kg => bmi ? bmiOf(kg) : u === 'kg' ? kg : kg * LB;
+  const vals = list.map(e => val(e.kg)).concat(g ? [val(g.kg)] : []);
+  let mn = Math.min(...vals), mx = Math.max(...vals);
+  const minSpan = bmi ? 1 : 2;
+  if (mx - mn < minSpan){ const m = (mx + mn) / 2; mn = m - minSpan / 2; mx = m + minSpan / 2; }
   const t0 = wtTime(list[0]), t1 = wtTime(list[list.length - 1]), span = Math.max(1, t1 - t0);
   const X = e => pl + (W - pl - pr) * (wtTime(e) - t0) / span, Y = kg => pt + (H - pt - pb) * (mx - val(kg)) / (mx - mn);
-  const lab = v => u === 'kg' ? `${v.toFixed(1)} kg` : u === 'lb' ? `${v.toFixed(0)} lb` : wtFmt(v / LB, 'st');
-  let svg = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Weight over time">`;
-  [mn, mx].forEach(v => { const y = pt + (H - pt - pb) * (mx - v) / (mx - mn); svg += `<line x1="${pl}" x2="${W - pr}" y1="${y.toFixed(1)}" y2="${y.toFixed(1)}" class="grd"/><text x="${pl - 4}" y="${(y + 3).toFixed(1)}" class="ax" text-anchor="end">${esc(lab(v))}</text>`; });
+  const lab = v => bmi ? `BMI ${v.toFixed(1)}` : u === 'kg' ? `${v.toFixed(1)} kg` : u === 'lb' ? `${v.toFixed(0)} lb` : wtFmt(v / LB, 'st');
+  const yv = v => pt + (H - pt - pb) * (mx - v) / (mx - mn);
+  let svg = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${bmi ? 'BMI' : 'Weight'} over time">`;
+  [mn, mx].forEach(v => { const y = yv(v); svg += `<line x1="${pl}" x2="${W - pr}" y1="${y.toFixed(1)}" y2="${y.toFixed(1)}" class="grd"/><text x="${pl - 4}" y="${(y + 3).toFixed(1)}" class="ax" text-anchor="end">${esc(lab(v))}</text>`; });
+  // BMI band edges (18.5, 25, 30) that fall inside the graph, as faint dotted lines
+  if (bmi) [18.5, 25, 30].filter(v => v > mn + .05 && v < mx - .05).forEach(v => { const y = yv(v); svg += `<line x1="${pl}" x2="${W - pr}" y1="${y.toFixed(1)}" y2="${y.toFixed(1)}" class="bmiedge"/><text x="${W - pr}" y="${(y - 2).toFixed(1)}" class="ax" text-anchor="end">${v}</text>`; });
+  if (g){ const y = yv(val(g.kg)); svg += `<line x1="${pl}" x2="${W - pr}" y1="${y.toFixed(1)}" y2="${y.toFixed(1)}" class="wgline"/><text x="${pl + 3}" y="${(y - 3).toFixed(1)}" class="ax wglab">Target</text>`; }
   svg += `<polyline class="sline" points="${list.map(e => X(e).toFixed(1) + ',' + Y(e.kg).toFixed(1)).join(' ')}"/>`;
   list.forEach(e => { svg += `<circle cx="${X(e).toFixed(1)}" cy="${Y(e.kg).toFixed(1)}" r="2.6" class="pdot"/>`; });
   const short = t => new Date(t).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
@@ -4525,19 +4567,34 @@ function renderWeight(){
   const last = all[all.length - 1], prev = all[all.length - 2], first = all[0];
   const due = wtTime(last) < wk, since = new Date(wtTime(first)).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
   const recent = all.filter(e => wtTime(e) >= Date.now() - 183 * DAY), chartList = recent.length >= 2 ? recent : all.slice(-2);
+  const bmiView = settings.wtView === 'bmi';
   box.innerHTML = `<div class="wtnow"><b>${wtFmt(last.kg)}</b><span class="muted">on ${fmtDate(wtTime(last))}</span></div>
     ${prev ? `<p>${wtChange(last.kg - prev.kg)} since the weigh-in before${all.length > 2 ? `, ${wtChange(last.kg - first.kg).toLowerCase()} since ${since}` : ''}.</p>` : ''}
+    ${bmiOf(last.kg) ? `<p class="muted">BMI ${bmiOf(last.kg).toFixed(1)} (${bmiBand(bmiOf(last.kg))})</p>` : ''}
+    ${goalHtml(last.kg)}
     ${due ? '<p class="wtdue">Time for this week’s weigh-in.</p>' : ''}
-    ${all.length >= 2 ? `<div class="chart">${wtChart(chartList)}</div>` : '<p class="muted">Your graph appears after your second weigh-in.</p>'}
-    <div class="row"><button class="sm${due ? ' primary' : ''}" data-wt="log">Log weight</button><button class="sm" data-wt="list">All weigh-ins</button></div>`;
+    ${all.length >= 2 ? `<div class="seg wtview" role="group" aria-label="Graph shows"><button data-wtv="wt" aria-pressed="${!bmiView}">Weight</button><button data-wtv="bmi" aria-pressed="${bmiView}">BMI</button></div>
+      ${bmiView && !heightM() ? '<p class="muted">Add your height to your profile details (Edit, above) to see your BMI.</p>' : `<div class="chart">${wtChart(chartList, bmiView)}</div>`}`
+      : '<p class="muted">Your graph appears after your second weigh-in.</p>'}
+    <div class="row"><button class="sm${due ? ' primary' : ''}" data-wt="log">Log weight</button><button class="sm" data-wt="list">All weigh-ins</button><button class="sm" data-wt="goal">${wtGoal() ? 'Change target' : 'Set target'}</button></div>`;
 }
-function openWeight(showList){
+// weight inputs in the chosen unit; p prefixes the ids (wt for a weigh-in, wg for the target)
+function wtInputs(p, kg0, label){
+  const u = wtUnit(), lb0 = kg0 ? kg0 * LB : null;
+  return u === 'st'
+    ? `<div class="wtst"><label class="f"><span>Stone</span><input type="number" inputmode="numeric" id="${p}St" min="4" max="40" step="1" value="${lb0 ? Math.floor(lb0 / 14) : ''}"></label>
+       <label class="f"><span>Pounds</span><input type="number" inputmode="decimal" id="${p}Lb" min="0" max="13.9" step="0.1" value="${lb0 ? (Math.round((lb0 % 14) * 10) / 10) : ''}"></label></div>`
+    : `<label class="f"><span>${label} (${u})</span><input type="number" inputmode="decimal" id="${p}Val" step="0.1" value="${kg0 ? (u === 'kg' ? kg0 : kg0 * LB).toFixed(1) : ''}"></label>`;
+}
+function readWtInputs(d, p){
+  const u = wtUnit();
+  if (u === 'st'){ const st = parseFloat(d.querySelector(`#${p}St`).value) || 0, lb = parseFloat(d.querySelector(`#${p}Lb`).value) || 0; return (st * 14 + lb) / LB; }
+  const v = parseFloat(d.querySelector(`#${p}Val`).value); return u === 'kg' ? v : v / LB;
+}
+function openWeight(showList, goalOpen){
   const d = $('#wtDlg'), u = wtUnit(), last = weighIns().slice(-1)[0], today = isoDay(Date.now());
-  const kg0 = last ? last.kg : settings.weight || null, lb0 = kg0 ? kg0 * LB : null;
-  const inputs = u === 'st'
-    ? `<div class="wtst"><label class="f"><span>Stone</span><input type="number" inputmode="numeric" id="wtSt" min="4" max="40" step="1" value="${lb0 ? Math.floor(lb0 / 14) : ''}"></label>
-       <label class="f"><span>Pounds</span><input type="number" inputmode="decimal" id="wtLb" min="0" max="13.9" step="0.1" value="${lb0 ? (Math.round((lb0 % 14) * 10) / 10) : ''}"></label></div>`
-    : `<label class="f"><span>Weight (${u})</span><input type="number" inputmode="decimal" id="wtVal" step="0.1" value="${kg0 ? (u === 'kg' ? kg0 : kg0 * LB).toFixed(1) : ''}"></label>`;
+  const kg0 = last ? last.kg : settings.weight || null, g = wtGoal();
+  const inputs = wtInputs('wt', kg0, 'Weight');
   const list = weighIns().slice().reverse();
   d.innerHTML = `<h3>Log your weight</h3>
     <div class="seg" id="wtUnits" role="group" aria-label="Units">${[['kg', 'kg'], ['st', 'st & lb'], ['lb', 'lb']].map(([k, l]) => `<button data-u="${k}" aria-pressed="${k === u}">${l}</button>`).join('')}</div>
@@ -4545,15 +4602,33 @@ function openWeight(showList){
     <p class="fhint">Weigh yourself at the same time of day each week, for example first thing on a Monday, for the fairest comparison. A second weigh-in on the same day replaces the first.</p>
     <p class="err" id="wtErr"></p>
     <button class="sm primary" id="wtSave">Save weigh-in</button>
+    <details class="sect" data-sect="wtgoal"${goalOpen || (goalOpen == null && sectOpen('wtgoal', false)) ? ' open' : ''}><summary>Target weight<span class="count">${g ? esc(wtFmt(g.kg)) : 'Not set'}</span></summary><div class="sbody">
+      <div class="fg">${wtInputs('wg', g ? g.kg : null, 'Target')}</div>
+      <p class="fhint">${g ? `Progress counts from ${esc(wtFmt(g.from))}, your weight when you set this target.` : 'Progress counts from your latest weigh-in. It shows on your weight graph and in your weekly and monthly summaries.'}</p>
+      <p class="err" id="wgErr"></p>
+      <div class="row"><button class="sm primary" id="wgSave">${g ? 'Update target' : 'Set target'}</button>${g ? '<button class="sm danger" id="wgClear">Remove target</button>' : ''}</div>
+    </div></details>
     <details class="sect" data-sect="wtlist"${showList ? ' open' : ''}><summary>All weigh-ins<span class="count">${list.length}</span></summary><div class="sbody">
       <ul class="hollist">${list.length ? list.map(e => `<li><span>${fmtDate(wtTime(e))}: <strong>${wtFmt(e.kg)}</strong></span><button class="link danger-link" data-wtdel="${esc(e.d)}">Remove</button></li>`).join('') : '<li class="muted">No weigh-ins yet.</li>'}</ul>
     </div></details>
     <div class="drow"><span></span><button id="wtClose">Done</button></div>`;
-  d.querySelector('#wtUnits').onclick = e => { const b = e.target.closest('button[data-u]'); if (!b) return; settings.wtUnit = b.dataset.u; saveSettings(); openWeight(d.querySelector('details').open); renderWeight(); renderPcard(); };
+  d.querySelector('#wtUnits').onclick = e => { const b = e.target.closest('button[data-u]'); if (!b) return; settings.wtUnit = b.dataset.u; saveSettings(); openWeight(d.querySelector('[data-sect=wtlist]').open, d.querySelector('[data-sect=wtgoal]').open); renderWeight(); renderPcard(); };
+  d.querySelector('#wgSave').onclick = () => {
+    const kg = Math.round(readWtInputs(d, 'wg') * 1000) / 1000, now = weighIns().slice(-1)[0], from = now ? now.kg : +settings.weight || null;
+    if (!(kg >= 30 && kg <= 250)){ d.querySelector('#wgErr').textContent = 'That target doesn’t look right. Please check it.'; return; }
+    if (from && Math.abs(kg - from) < .1){ d.querySelector('#wgErr').textContent = 'That’s your current weight. Pick a target above or below it.'; return; }
+    // keep the original starting point when only the target moves in the same direction
+    const keep = g && (g.kg < g.from) === (kg < g.from) ? g.from : from;
+    settings.wtGoal = { kg, from: keep, d: g && keep === g.from ? g.d : today }; saveSettings();
+    openWeight(false, false); renderWeight();
+    toast(`Target set: ${wtFmt(kg)}`);
+  };
+  if (d.querySelector('#wgClear')) d.querySelector('#wgClear').onclick = () => {
+    if (!confirm('Remove your target weight?')) return;
+    delete settings.wtGoal; saveSettings(); openWeight(false, false); renderWeight(); toast('Target removed');
+  };
   d.querySelector('#wtSave').onclick = () => {
-    let kg;
-    if (u === 'st'){ const st = parseFloat(d.querySelector('#wtSt').value) || 0, lb = parseFloat(d.querySelector('#wtLb').value) || 0; kg = (st * 14 + lb) / LB; }
-    else { const v = parseFloat(d.querySelector('#wtVal').value); kg = u === 'kg' ? v : v / LB; }
+    const kg = readWtInputs(d, 'wt');
     const day = d.querySelector('#wtDate').value || today;
     if (!(kg >= 30 && kg <= 250)){ d.querySelector('#wtErr').textContent = 'That weight doesn’t look right. Please check it.'; return; }
     if (day > today){ d.querySelector('#wtErr').textContent = 'The date can’t be in the future.'; return; }
@@ -5189,7 +5264,11 @@ $('#setWtTrack').onchange = e => { settings.wtTrack = e.target.checked; saveSett
 $('#themeSeg').addEventListener('click', e => { const b = e.target.closest('button[data-th]'); if (b){ settings.theme = b.dataset.th; saveSettings(); applyTheme(); renderSettings(); } });
 $('#lastWeekBtn').onclick = () => { const ws = weekStart(Date.now()); ws.setDate(ws.getDate() - 7); openSummary(ws); };
 $('#lastMonthBtn').onclick = () => openMonthly(1);
-$('#wtBox').addEventListener('click', e => { const b = e.target.closest('[data-wt]'); if (b) openWeight(b.dataset.wt === 'list'); });
+$('#wtBox').addEventListener('click', e => {
+  const v = e.target.closest('[data-wtv]');
+  if (v){ settings.wtView = v.dataset.wtv; saveSettings(); renderWeight(); return; }
+  const b = e.target.closest('[data-wt]'); if (b) openWeight(b.dataset.wt === 'list', b.dataset.wt === 'goal');
+});
 const MONKEY = 'tm-month-shown-v1';
 function openMonthly(off = 1){
   const now = new Date(), ms = new Date(now.getFullYear(), now.getMonth() - off, 1).getTime(), me = new Date(now.getFullYear(), now.getMonth() - off + 1, 1).getTime(), ps = new Date(now.getFullYear(), now.getMonth() - off - 1, 1).getTime();
