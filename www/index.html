@@ -1013,6 +1013,7 @@ body.picking{overflow:hidden}
   <div class="gl-top"><span class="gl-state"><span id="glState"></span><span class="glflame" id="glFlame"></span></span>
     <div class="gl-topbtns">
       <button class="gl-close gl-mute" id="glCtlBtn" aria-label="Hide treadmill controls" aria-pressed="false" hidden><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg></button>
+      <button class="gl-close gl-mute" id="glMapBtn" aria-label="Hide journey map" aria-pressed="false" hidden><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"><path d="M3 6.5l6-2.5 6 2.5 6-2.5v13.5l-6 2.5-6-2.5-6 2.5z"/><path d="M9 4v13.5M15 6.5V20"/></svg></button>
       <button class="gl-close gl-mute" id="glMute" aria-label="Mute audio" aria-pressed="false"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M4 9h4l5-4v14l-5-4H4z" fill="currentColor"/><path class="snd-on" d="M16 9.5a3.5 3.5 0 0 1 0 5M18.5 7a7 7 0 0 1 0 10" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path class="snd-off" d="M16 9l5 6M21 9l-5 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>
       <button class="gl-close" id="glClose">Close</button>
     </div></div>
@@ -3330,7 +3331,12 @@ function renderGlance(){
   $('#glStep').textContent = step;
   $('#glance').classList.add('has-tl');
   // with a journey on, the map takes the timeline's place on free runs with no target; workouts keep both
-  const jOn = !!jState(), keepTl = !jOn || wo || getWorkout(selected) || currentFT().k !== 'none';
+  // the map button shows whenever a journey is on; pressed means the map is hidden and the usual view is back
+  const jHas = !!jState(), jOn = jHas && !settings.glMapHide;
+  $('#glMapBtn').hidden = !jHas;
+  $('#glMapBtn').setAttribute('aria-pressed', jHas && !!settings.glMapHide);
+  $('#glMapBtn').setAttribute('aria-label', settings.glMapHide ? 'Show journey map' : 'Hide journey map');
+  const keepTl = !jOn || wo || getWorkout(selected) || currentFT().k !== 'none';
   $('#glTl').hidden = !keepTl;
   $('#glance').classList.toggle('has-map', jOn);
   $('#glance').classList.toggle('map-only', jOn && !keepTl);
@@ -3389,7 +3395,7 @@ function glMapBuild(st, km, zoom){
   return { svg, key: `${j.id}|${zoom ? 'z' + idx : 'all'}|${st.passed}|${profiles.current}|${style}`, s, P, style };
 }
 function renderGlMap(){
-  const box = $('#glMap'), st = jState();
+  const box = $('#glMap'), st = settings.glMapHide ? null : jState();
   if (!st){ if (!box.hidden) box.hidden = true; glMapKey = ''; return; }
   box.hidden = false;
   const km = Math.min(st.len, st.km + (run ? run.dist / 1000 : 0)), j = st.j;
@@ -4393,7 +4399,23 @@ const BADGES = [
   ['twoday', 'Back-to-back', 'Be active for 10 minutes on two days in a row', 'bronze', '✌️'],
   ['explorer', 'Workout explorer', 'Finish any ready-made workout', 'bronze', '🎒'],
   ['giant', 'Giant killer', 'Beat a family member’s best while racing their ghost', 'gold', '🗡️'],
-  ['perfectweek', 'Perfect week', 'Be active for 10 minutes every day from Monday to Sunday, with no freezes', 'gold', '🌟']
+  ['perfectweek', 'Perfect week', 'Be active for 10 minutes every day from Monday to Sunday, with no freezes', 'gold', '🌟'],
+  ['jfirst', 'First journey', 'Finish any virtual journey', 'bronze', '🧭'],
+  ['j_penyfan', 'Pen y Fan', 'Finish the Pen y Fan mountain walk', 'bronze', '🌄'],
+  ['j_scafell', 'Scafell Pike', 'Finish the Scafell Pike mountain walk, England’s highest', 'silver', '⛰️'],
+  ['j_snowdon', 'Yr Wyddfa', 'Finish the Snowdon / Yr Wyddfa mountain walk, the highest in Wales', 'silver', '🐉'],
+  ['j_helvellyn', 'Striding Edge', 'Finish the Helvellyn mountain walk', 'silver', '🧗'],
+  ['j_bennevis', 'Ben Nevis', 'Finish the Ben Nevis mountain walk, Britain’s highest', 'gold', '🏔️'],
+  ['j_3peaks', 'Yorkshire Three Peaks', 'Finish the Yorkshire Three Peaks loop', 'gold', '🐑'],
+  ['jnat3', 'National Three Peaks', 'Finish Ben Nevis, Scafell Pike and Snowdon', 'special', '🗻'],
+  ['j_marathon', 'London Marathon', 'Finish the London Marathon journey', 'silver', '🎡'],
+  ['j_dalesway', 'Dales Way', 'Finish the Dales Way journey', 'silver', '🏞️'],
+  ['j_hadrian', 'Hadrian’s Wall', 'Finish the Hadrian’s Wall Path journey', 'silver', '🏛️'],
+  ['j_c2c', 'Coast to Coast', 'Finish the Coast to Coast journey', 'gold', '🌊'],
+  ['j_pennine', 'Pennine Way', 'Finish the Pennine Way journey', 'gold', '🥾'],
+  ['j_lejog', 'End to End', 'Finish Land’s End to John o’Groats', 'special', '🇬🇧'],
+  ['j5', 'Seasoned traveller', 'Finish 5 different virtual journeys', 'gold', '🗺️'],
+  ['jall', 'Grand tour', 'Finish every virtual journey', 'special', '🎒']
 ].map(([id, name, desc, tier, icon]) => ({ id, name, desc, tier, icon }));
 function computeBadges(pid, extra = []){
   const runs = profileRuns(pid).concat(extra).sort((a, b) => a.date - b.date);
@@ -4488,6 +4510,23 @@ function computeBadges(pid, extra = []){
   prog.plans3 = [nPlans / 3, `${nPlans} of 3 plans finished`];
   prog.presets = [presetsDone.size / presetIds.size, `${presetsDone.size} of ${presetIds.size} ready-made workouts finished`];
   prog.losing5 = [lose / 5, `${lose} of 5 weeks`];
+  // virtual journeys: a badge for each one finished (first finish counts), plus collections
+  const jDone = {}; (ps.journeysDone || []).forEach(x => { if (jById(x.id) && !(x.id in jDone)) jDone[x.id] = x.end; });
+  const jIds = Object.keys(jDone), jWhen = ids => Math.max(...ids.map(id => jDone[id]));
+  jIds.forEach(id => { if (BADGES.some(b => b.id === 'j_' + id)) earn('j_' + id, jDone[id]); });
+  if (jIds.length) earn('jfirst', Math.min(...jIds.map(id => jDone[id])));
+  const nat3 = ['bennevis', 'scafell', 'snowdon'];
+  if (nat3.every(id => id in jDone)) earn('jnat3', jWhen(nat3));
+  if (jIds.length >= 5) earn('j5', jIds.map(id => jDone[id]).sort((a, b) => a - b)[4]);
+  if (JOURNEYS.every(j => j.id in jDone)) earn('jall', jWhen(JOURNEYS.map(j => j.id)));
+  const jNow = jState(pid);
+  JOURNEYS.forEach(j => { prog['j_' + j.id] = jNow && jNow.j.id === j.id && !jNow.done
+    ? [jNow.km / jNow.len, `${fD(jNow.km * 1000, 1)} of ${fD(jNow.len * 1000, 1)} ${dU()} so far`] : [0, 'Choose it under Virtual journey on the Workouts tab']; });
+  prog.jfirst = jNow && !jNow.done ? [jNow.km / jNow.len, `${Math.round(jNow.km / jNow.len * 100)}% through ${jNow.j.name}`] : [0, ''];
+  const n3 = nat3.filter(id => id in jDone).length;
+  prog.jnat3 = [n3 / 3, `${n3} of 3 peaks`];
+  prog.j5 = [Math.min(1, jIds.length / 5), `${jIds.length} of 5 journeys`];
+  prog.jall = [jIds.length / JOURNEYS.length, `${jIds.length} of ${JOURNEYS.length} journeys`];
   return { got, prog };
 }
 const BADGE_GROUPS = [
@@ -4498,7 +4537,8 @@ const BADGE_GROUPS = [
   ['Run count', ['c10', 'c25', 'c50', 'c100']],
   ['Streaks and habits', ['day7', 'comeback', 'perfectweek', 'day30', 'day100', 'day365', 'streak4', 'streak12', 'goal4']],
   ['Workouts and plans', ['wo10', 'plan', 'presets', 'plans3']],
-  ['Competition', ['pod5', 'gold1', 'gold5', 'giant', 'losing5']]
+  ['Competition', ['pod5', 'gold1', 'gold5', 'giant', 'losing5']],
+  ['Journeys', ['jfirst', 'j_penyfan', 'j_scafell', 'j_snowdon', 'j_helvellyn', 'j_bennevis', 'j_3peaks', 'jnat3', 'j_marathon', 'j_dalesway', 'j_hadrian', 'j_c2c', 'j_pennine', 'j_lejog', 'j5', 'jall']]
 ];
 function renderBadges(){
   const { got, prog } = computeBadges(profiles.current), n = BADGES.filter(b => got[b.id]).length;
@@ -5032,6 +5072,7 @@ function journeyCheck(){
   if (st.done){
     settings.journeysDone = (settings.journeysDone || []).concat({ id: st.j.id, start: st.a.start, end: Date.now() });
     showBadgeText(`🏁 ${st.j.name} complete!`); toast(`🏁 You’ve finished ${st.j.name}!`);
+    setTimeout(checkNewBadges, 2200);   // its journey badge (and any collection badge) unlocks now
   } else {
     showBadgeText(`📍 You’ve reached ${town}`); toast(`📍 ${st.j.name}: you’ve reached ${town}. ${st.next[0]} is next.`);
   }
@@ -5847,6 +5888,10 @@ window.addEventListener('popstate', () => closeGlance(true));
 $('#live').addEventListener('click', openGlance);
 $('#live').addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' '){ e.preventDefault(); openGlance(); } });
 $('#glMain').addEventListener('click', () => closeGlance(false));
+$('#glMapBtn').onclick = () => {
+  settings.glMapHide = !settings.glMapHide; saveSettings();
+  glMapKey = ''; $('#glNums').style.zoom = ''; glTlMax = 0; renderGlance();
+};
 $('#glMap').addEventListener('click', e => {
   e.stopPropagation();                       // tapping the map doesn't close the big screen
   const st = jState(); if (!st || st.len <= 50) return;
