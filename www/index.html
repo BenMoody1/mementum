@@ -545,6 +545,40 @@ nav.tabs button{padding:0 .15rem;font-size:.86rem}
 .wtbox .wtnow b{font-family:var(--num);font-weight:600;font-size:1.9rem;line-height:1}
 .wtbox p{margin:.25rem 0}
 .wtdue{font-weight:600;color:var(--track)}
+.jterr{margin:.4rem 0 .6rem}
+.jprof{display:block;width:100%;height:auto;margin:.2rem 0 .4rem}
+.jparea{fill:var(--rule);opacity:.55}
+.jpline{fill:none;stroke:var(--muted);stroke-width:1.4;stroke-linejoin:round}
+.jpdone{fill:var(--track);opacity:.35}
+.jpnow{stroke:var(--track);stroke-width:1.2;stroke-dasharray:3 2}
+.jpdot{fill:var(--track);stroke:var(--paper);stroke-width:1.5}
+.jmax{max-width:12rem;margin-top:.4rem}
+.jgrp{margin:1rem 0 .4rem}
+.terrline{font-weight:600;margin:.2rem 0}
+.jhead{display:flex;justify-content:space-between;align-items:baseline;gap:.5rem;flex-wrap:wrap}
+.jprog{height:10px;border-radius:5px;margin:.4rem 0}
+.jwrap{margin:.5rem 0;border-radius:14px;overflow:hidden;border:1px solid var(--rule)}
+.jmap{display:block;width:100%;height:auto;max-height:62vh}
+.jsea{fill:var(--sea)}
+.jland{fill:var(--land);stroke:var(--coast);stroke-linejoin:round}
+.jroute{fill:none;stroke:var(--muted);stroke-linecap:round;stroke-linejoin:round;opacity:.7}
+.jdone{fill:none;stroke:var(--track);stroke-linecap:round;stroke-linejoin:round}
+.jpt{fill:var(--paper);stroke:var(--muted);stroke-width:1.2px;vector-effect:non-scaling-stroke}
+.jpt.on{fill:var(--track);stroke:none}
+.jlake{fill:var(--sea);stroke:var(--coast);stroke-width:1px;vector-effect:non-scaling-stroke}
+.jriver{fill:none;stroke:var(--coast);stroke-width:1.6px;stroke-linecap:round;stroke-linejoin:round;opacity:.9}
+.jlab{fill:var(--ink);font-family:var(--body);font-weight:600;paint-order:stroke;stroke:var(--land);stroke-width:.25em;stroke-linejoin:round}
+:root{--sea:#d6e6ee;--land:#f4efe6;--coast:#a9bcc6}
+:root[data-theme="dark"]{--sea:#0f1d24;--land:#1f2a27;--coast:#3b5660}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--sea:#0f1d24;--land:#1f2a27;--coast:#3b5660}}
+.jme circle{fill:var(--track);stroke:var(--paper)}
+.jme.other circle{fill:var(--infield)}
+.jme text{fill:#fff;font-family:var(--body);font-weight:700;text-anchor:middle}
+.jothers{margin:.2rem 0}
+.jstops{list-style:none;margin:0;padding:0}
+.jstops li{display:flex;justify-content:space-between;gap:.5rem;padding:.35rem 0 .35rem 1.1rem;border-bottom:1px solid var(--rule);position:relative}
+.jstops li::before{content:"";position:absolute;left:.15rem;top:.85rem;width:.5rem;height:.5rem;border-radius:50%;border:1.5px solid var(--muted)}
+.jstops li.on::before{background:var(--track);border-color:var(--track)}
 .wtgoal{margin:.5rem 0}
 .wtgoal .prog{height:10px;border-radius:5px;margin:.2rem 0 .3rem}
 .wtgoal p{margin:0}
@@ -716,6 +750,7 @@ body.picking{overflow:hidden}
     <div class="step-actions" id="stepActions"><button class="sm" id="skipStep">Skip step</button><button class="sm" id="endWo">End workout</button></div>
   </section>
 
+  <section class="step" id="terrainPanel" hidden></section>
   <section class="step" id="pacer" hidden>
     <div class="step-head"><span id="pacerLabel"></span><span id="pacerTarget"></span></div>
     <div class="step-big"><span class="n" id="pacerDiff"></span><span class="u" id="pacerDiffU"></span></div>
@@ -774,6 +809,8 @@ body.picking{overflow:hidden}
   <h3>Personal bests</h3>
   <p class="fhint">Fastest efforts found anywhere inside your runs.</p>
   <div class="stats two" id="pbs"></div>
+  <div id="jrSect"><h3>Virtual journey</h3>
+  <div id="jrBox"></div></div>
   <div id="wtSect"><h3>Weight</h3>
   <div class="wtbox" id="wtBox"></div></div>
   </div>
@@ -991,6 +1028,7 @@ body.picking{overflow:hidden}
 <dialog id="profDlg"></dialog>
 <dialog id="detail"></dialog>
 <dialog id="sumDlg"></dialog>
+<dialog id="jrDlg"></dialog>
 <dialog id="wtDlg"></dialog>
 <dialog id="builder"></dialog>
 <div class="toast" id="toast" hidden></div>
@@ -1144,7 +1182,7 @@ const freshCtrl = () => ({ speed: false, incline: false, ok: false, granted: fal
 let ctrl = freshCtrl();
 let isDemo = false, demo = null;
 let live = { speed: 0, incline: 0, hr: null, hrTs: 0 };
-let run = null, lastTs = null, lastDist = null, lastKcal = null, tmDist = false, lastSteps = null;
+let run = null, lastTs = null, lastDist = null, lastKcal = null, tmDist = false, lastSteps = null, lastElapsed = null;
 let needStop = false;
 let ctrlTarget = { sp: null, spTs: 0, inc: null, inTs: 0 };
 let wo = null, wakeLock = null, chartMode = 'week', filterTag = null;
@@ -1954,6 +1992,8 @@ function parseTreadmill(dv){
   if (f & 0x0040) o += 1;
   if (f & 0x0080) { if (has(2)) { const k = dv.getUint16(o, true); if (k !== 0xFFFF) r.kcal = k; } o += 5; }
   if (f & 0x0100) { if (has(1)) { const h = dv.getUint8(o); if (h > 0) r.hr = h; } o += 1; }
+  if (f & 0x0200) o += 1;                                            // metabolic equivalent
+  if (f & 0x0400) { if (has(2)) r.elapsed = dv.getUint16(o, true); o += 2; } // the treadmill's own clock, in seconds
   return r;
 }
 
@@ -1998,18 +2038,29 @@ function startRun(){
   run = { start: Date.now(), moving: 0, dist: 0, climb: 0, maxSpeed: 0, incSum: 0, kcal: 0, hasKcal: false, kcalEst: 0, steps: 0,
           hrSum: 0, hrT: 0, hrMax: 0, zones: [0, 0, 0, 0, 0], splitsKm: [], splitsMi: [], samples: [], track: [[0, 0]],
           lastSample: -5, demo: isDemo, workoutName: null, workoutKind: null };
-  lastDist = null; lastKcal = null; tmDist = false; lastSteps = null;
+  lastDist = null; lastKcal = null; tmDist = false; lastSteps = null; lastElapsed = null;
   requestWake();
   run.freeTarget = getWorkout(selected) ? null : (settings.freeTarget || 'none'); run.freeDone = false;
   if (getWorkout(selected)) beginWorkout();
 }
 
 function onData(r, now = performance.now()){
+  const wasMoving = live.speed > MOVING;
   if (r.speed != null) live.speed = r.speed;
   if (r.incline != null) live.incline = r.incline;
   if (r.hr != null && !hrCh){ live.hr = r.hr; live.hrTs = performance.now(); }
   if (live.hr != null && performance.now() - live.hrTs > 5000) live.hr = null;
-  const dt = lastTs == null ? 0 : Math.min((now - lastTs) / 1000, 3);
+  /* Time since the last message. In the background (in YouTube, say) Android hands Bluetooth messages
+   * over in bursts every few seconds instead of one a second, so a gap is only capped at 3 s when the
+   * belt wasn't moving on both sides of it; otherwise the whole gap counts (up to 2 minutes). When the
+   * treadmill sends its own elapsed-time counter, that's used instead, as it can't drift at all. */
+  const gap = lastTs == null ? 0 : Math.max(0, (now - lastTs) / 1000), cap = wasMoving && live.speed > MOVING ? 120 : 3;
+  let dt = Math.min(gap, cap);
+  if (r.elapsed != null){
+    // whole seconds from the treadmill; they add up exactly over the run, however bunched the messages arrive
+    if (lastElapsed != null && lastTs != null && r.elapsed >= lastElapsed) dt = Math.min(r.elapsed - lastElapsed, cap);
+    lastElapsed = r.elapsed;
+  }
   lastTs = now;
 
   if (needStop && live.speed <= MOVING) needStop = false; // a new run only starts once the belt has stopped
@@ -2060,6 +2111,7 @@ function onData(r, now = performance.now()){
     }
     tickWorkout();
     checkFreeTarget();
+    terrainTick();
   }
   renderLive();
 }
@@ -2094,6 +2146,7 @@ function toRecord(r){
 
 function finishRun(){
   if (!run) return;
+  terr.sent = null; terr.seg = -1; terr.held = -1;
   const wasMoving = live.speed > MOVING;
   let savedId = null;
   if (run.demo){ toast('Demo runs aren’t saved'); }
@@ -2102,7 +2155,7 @@ function finishRun(){
     const rec = toRecord(run), runs = store.get(KEY, []), beat = raceBeat();
     if (beat){ rec.beat = beat; setTimeout(() => { showBadgeText(`You beat ${beat.name}’s best!`); toast(`🏆 You beat ${beat.name}’s best!`); }, 900); }
     runs.unshift(rec);
-    if (store.set(KEY, runs)){ toast('Run saved'); savedId = rec.id; exportAfterRun(rec); planCheck(rec); if (window.mmHealth) mmHealth.onSaved(rec); setTimeout(checkNewBadges, 2600); }
+    if (store.set(KEY, runs)){ toast('Run saved'); savedId = rec.id; exportAfterRun(rec); planCheck(rec); if (window.mmHealth) mmHealth.onSaved(rec); setTimeout(checkNewBadges, 2600); setTimeout(journeyCheck, 4600); }
     else toast('Couldn’t save: browser storage is full or blocked. Back up and delete old runs.');
   }
   store.del(DRAFT);
@@ -2413,7 +2466,7 @@ async function openTreadmill(quiet){
       ch = c; cpCh = null;
       ctrl = { ...freshCtrl(), speed: true, ok: true, granted: true, speedRange: [1, 6, 0.1], inclineRange: [0, 0, 1] };
     }
-    lastTs = null; rememberDevice('tm', dev);
+    lastTs = null; lastElapsed = null; rememberDevice('tm', dev);
     if (!quiet && $('#connDlg').open) setTimeout(() => { if (ch) $('#connDlg').close(); }, 800);
     if (!quiet) showMsg('');
   } catch(e){
@@ -2429,7 +2482,7 @@ async function openTreadmill(quiet){
 }
 
 async function onTmDisconnect(){
-  ch = null; cpCh = null; pp = null; ctrl.granted = false; lastTs = null; live.speed = 0;
+  ch = null; cpCh = null; pp = null; ctrl.granted = false; lastTs = null; lastElapsed = null; live.speed = 0;
   renderConn(); renderLive();
   if (tmManual || tmReconnecting) return;
   tmReconnecting = true;
@@ -3198,6 +3251,7 @@ function openSummary(ws){
     ${pbs.length ? `<h4>New personal bests</h4><ul class="sumlist">${pbs.map(x => `<li>${esc(x)}</li>`).join('')}</ul>` : ''}
     ${plan ? `<p>${planDone} training plan session${planDone === 1 ? '' : 's'} completed.</p>` : ''}`
     : '<p class="muted">No runs logged that week.</p>'}
+    ${jReportLine(start, end.getTime())}
     ${wtReportLine(start, end.getTime(), 'this week')}
     <div class="drow"><span></span><button class="sm primary" id="sumClose">Close</button></div>`;
   d.querySelector('#sumClose').onclick = () => d.close();
@@ -3882,7 +3936,7 @@ $('#whoPick').addEventListener('click', e => {
 let awayAt = 0; // coming back after half an hour or more asks again
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) awayAt = Date.now();
-  else if (awayAt && Date.now() - awayAt > 30 * 60e3 && $('#whoPick').hidden) openWhoPick();
+  else if (awayAt && Date.now() - awayAt > 30 * 60e3 && $('#whoPick').hidden && !run) openWhoPick(); // never mid-run, e.g. back from YouTube
 });
 
 function refreshStreak(st){
@@ -4055,7 +4109,7 @@ function boardCard(label, entries, fmt){
   if (!entries.length) return `<div class="prcard"><div class="lab">${label}</div><div class="t">–</div><div class="wsum">No one yet</div></div>`;
   const h = entries[0];
   return `<div class="prcard"><div class="lab">${label}</div><div class="t">${fmt(h.v)}</div>
-    <div class="who">${avatar(h.p)}<span>${esc(h.p.name)}</span></div>${h.date ? `<div class="wsum">${fmtDate(h.date)}</div>` : ''}
+    <div class="who">${avatar(h.p)}<span>${esc(h.p.name)}</span></div>${h.when ? `<div class="wsum">${esc(h.when)}</div>` : h.date ? `<div class="wsum">${fmtDate(h.date)}</div>` : ''}
     ${entries.length > 1 ? `<ol start="2">${entries.slice(1, 3).map(x => `<li>${esc(x.p.name)}, ${fmt(x.v)}</li>`).join('')}</ol>` : ''}</div>`;
 }
 let lbMode = 'week';
@@ -4143,7 +4197,20 @@ function renderLeaders(){
   const longest = people.map(x => { const r = x.runs.reduce((a, r) => !a || r.dist > a.dist ? r : a, null); return r ? { p: x.p, v: r.dist, date: r.date } : null; })
     .filter(Boolean).sort((a, b) => b.v - a.v);
   const total = people.map(x => ({ p: x.p, v: x.runs.reduce((a, r) => a + r.dist, 0) })).filter(x => x.v > 0).sort((a, b) => b.v - a.v);
-  $('#lbAll').innerHTML = boardCard('Longest run', longest, v => `${fD(v)} ${dU()}`) + boardCard('Total distance', total, v => `${fD(v, 1)} ${dU()}`);
+  // best single week (Monday to Sunday) and best calendar month for each person, including the one in progress
+  const bestPeriod = (key, when) => people.map(x => {
+    const tot = new Map();
+    x.runs.forEach(r => { const k = key(r.date); tot.set(k, (tot.get(k) || 0) + r.dist); });
+    let best = null; tot.forEach((v, k) => { if (v > 0 && (!best || v > best.v)) best = { v, k }; });
+    return best ? { p: x.p, v: best.v, when: when(best.k) } : null;
+  }).filter(Boolean).sort((a, b) => b.v - a.v);
+  const dm = t => new Date(t).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+  const bestWeek = bestPeriod(t => weekStart(t).getTime(), k => `Week of ${dm(k)} ${new Date(k).getFullYear()}`);
+  const bestMonth = bestPeriod(t => { const d = new Date(t); return new Date(d.getFullYear(), d.getMonth(), 1).getTime(); },
+    k => new Date(k).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' }));
+  const km1 = v => `${fD(v, 1)} ${dU()}`;
+  $('#lbAll').innerHTML = boardCard('Longest run', longest, v => `${fD(v)} ${dU()}`) + boardCard('Total distance', total, km1)
+    + boardCard('Most in a week', bestWeek, km1) + boardCard('Most in a month', bestMonth, km1);
   renderBadges();
   renderBadgeBoard();
 }
@@ -4662,6 +4729,212 @@ function addWeighIns(list){
 // the newest weigh-in is the weight used for calorie estimates
 function syncWeightSetting(){ const last = weighIns().slice(-1)[0]; if (last) settings.weight = last.kg; }
 
+/* ---------- virtual journeys ----------
+ * Distance run since you start a journey moves you along a real route. A journey is a list of
+ * [town, lat, lon, km along the route]; the map is a simplified outline of Britain and Ireland
+ * (Natural Earth, public domain) drawn in km, shared by every journey. All of it is built in, so it
+ * works offline. settings.journey = { id, start (ms), seen (milestones already celebrated) };
+ * finished journeys go in settings.journeysDone. Both live in the profile's settings, so they sync. */
+const JOURNEYS = [{"id":"penyfan","name":"Pen y Fan","blurb":"The roof of the Brecon Beacons from Pont ar Daf, up to Bwlch Duwynt and over Corn Du to the summit, and back.","pts":[["Pont ar Daf",51.8838,-3.488,0],["Bwlch Duwynt",51.884,-3.443,2.6],["Corn Du",51.8803,-3.4458,3.2],["Pen y Fan summit",51.8843,-3.4367,3.8],["Bwlch Duwynt",51.884,-3.443,4.6],["Pont ar Daf",51.8838,-3.488,7.6]],"prof":[[0,440],[1.0,530],[2.6,790],[3.2,873],[3.4,850],[3.8,886],[4.4,790],[6.0,530],[7.6,440]],"kind":"mountain"},{"id":"scafell","name":"Scafell Pike","blurb":"England’s highest mountain from Wasdale Head, up Brown Tongue to Hollow Stones and Lingmell Col, and back the same way.","pts":[["Wasdale Head",54.4425,-3.2867,0],["Lingmell Gill",54.4415,-3.27,1.2],["Hollow Stones",54.444,-3.225,2.9],["Lingmell Col",54.4505,-3.2195,3.6],["Scafell Pike summit",54.4542,-3.2116,4.85],["Hollow Stones",54.444,-3.225,6.8],["Wasdale Head",54.4425,-3.2867,9.7]],"prof":[[0,80],[1.2,200],[2.0,380],[2.9,600],[3.6,730],[4.85,978],[6.1,730],[6.8,600],[7.7,380],[8.5,200],[9.7,80]],"kind":"mountain"},{"id":"snowdon","name":"Snowdon / Yr Wyddfa","blurb":"Up the Pyg Track from Pen-y-Pass to the summit of Wales, then down the Miners’ Track past Glaslyn and Llyn Llydaw.","pts":[["Pen-y-Pass",53.0806,-4.0207,0],["Bwlch y Moch",53.0786,-4.0369,1.6],["Bwlch Glas",53.0718,-4.075,5.0],["Snowdon summit",53.0685,-4.0762,5.6],["Glaslyn",53.0735,-4.06,7.8],["Llyn Llydaw",53.0745,-4.043,9.0],["Pen-y-Pass",53.0806,-4.0207,11.5]],"prof":[[0,359],[1.6,570],[2.8,640],[3.9,750],[5.0,990],[5.6,1085],[6.2,990],[7.1,750],[7.8,600],[9.0,440],[11.5,359]],"kind":"mountain"},{"id":"helvellyn","name":"Helvellyn","blurb":"The Lake District favourite from Glenridding: over the Hole-in-the-Wall and along Striding Edge to the summit, down Swirral Edge to Red Tarn.","pts":[["Glenridding",54.544,-2.95,0],["Hole-in-the-Wall",54.53,-2.9917,4.3],["Striding Edge",54.5265,-3.0005,5.3],["Helvellyn summit",54.5271,-3.0164,6.3],["Swirral Edge",54.533,-3.013,7.0],["Red Tarn",54.53,-3.005,7.8],["Glenridding",54.544,-2.95,12.4]],"prof":[[0,150],[1.2,230],[2.5,450],[4.3,860],[5.3,860],[6.3,950],[7.0,830],[7.8,720],[9.5,450],[12.4,150]],"kind":"mountain"},{"id":"bennevis","name":"Ben Nevis","blurb":"Britain’s highest mountain by the Mountain Track from Glen Nevis, up past the Halfway Lochan and the zigzags to the summit plateau, and back down.","pts":[["Glen Nevis Visitor Centre",56.8046,-5.0759,0],["Halfway Lochan",56.81,-5.035,4.3],["Red Burn",56.802,-5.028,5.2],["Ben Nevis summit",56.7969,-5.0036,8.5],["Halfway Lochan",56.81,-5.035,12.7],["Glen Nevis Visitor Centre",56.8046,-5.0759,17.0]],"prof":[[0,20],[1.0,60],[2.0,250],[3.0,400],[4.3,570],[5.2,670],[6.2,900],[7.4,1150],[8.0,1290],[8.5,1345],[9.0,1290],[9.6,1150],[10.8,900],[11.8,670],[12.7,570],[14.0,400],[15.0,250],[16.0,60],[17.0,20]],"kind":"mountain"},{"id":"3peaks","name":"Yorkshire Three Peaks","blurb":"The classic Dales challenge: Pen-y-ghent, Whernside and Ingleborough in one loop from Horton-in-Ribblesdale.","pts":[["Horton-in-Ribblesdale",54.149,-2.293,0.0],["Pen-y-ghent",54.156,-2.249,4.3],["Ribblehead Viaduct",54.21,-2.37,21.2],["Whernside",54.227,-2.402,26.6],["Chapel-le-Dale",54.187,-2.411,30.6],["Ingleborough",54.166,-2.398,33.8],["Horton-in-Ribblesdale",54.149,-2.293,39.4]],"prof":[[0,230],[2.2,350],[4.3,694],[8,420],[14,330],[21.2,300],[24.0,450],[26.6,736],[29,450],[30.6,290],[32.6,550],[33.8,723],[36,500],[39.4,230]],"kind":"mountain"},{"id":"marathon","name":"London Marathon","blurb":"The marathon distance on the London course, from Blackheath past the Cutty Sark, over Tower Bridge and round Canary Wharf to the finish on The Mall.","pts":[["Blackheath",51.469,0.003,0],["Woolwich",51.488,0.067,4.8],["Cutty Sark",51.483,-0.01,10.5],["Rotherhithe",51.498,-0.05,16.0],["Tower Bridge",51.5055,-0.0754,20.0],["Limehouse",51.512,-0.039,23.0],["Mudchute",51.491,-0.014,26.5],["Canary Wharf",51.505,-0.019,30.0],["Tower of London",51.508,-0.076,36.0],["Blackfriars",51.511,-0.104,38.6],["Big Ben",51.5007,-0.1246,41.0],["The Mall",51.5045,-0.135,42.2]]},{"id":"dalesway","name":"Dales Way","blurb":"Riverside walking from Ilkley up Wharfedale and over to Dentdale, ending on the shore of Windermere.","pts":[["Ilkley",53.925,-1.822,0.0],["Bolton Abbey",53.983,-1.889,10.5],["Burnsall",54.047,-1.952,19.3],["Grassington",54.071,-1.998,24.1],["Kettlewell",54.146,-2.047,35.4],["Buckden",54.191,-2.091,41.8],["Cam Houses",54.233,-2.268,56.3],["Dent",54.278,-2.454,74.0],["Sedbergh",54.322,-2.528,82.1],["Burneside",54.355,-2.763,109.4],["Staveley",54.376,-2.818,112.7],["Bowness-on-Windermere",54.364,-2.919,127.1]]},{"id":"hadrian","name":"Hadrian’s Wall Path","blurb":"Coast to coast along the Roman wall, from Wallsend on the Tyne past Housesteads fort to Bowness-on-Solway.","pts":[["Wallsend",54.988,-1.534,0.0],["Newcastle Quayside",54.969,-1.606,8.0],["Heddon-on-the-Wall",54.997,-1.795,24.1],["Chollerford",55.033,-2.12,51.5],["Housesteads Fort",55.013,-2.331,67.6],["Steel Rigg",54.996,-2.392,74.0],["Greenhead",54.982,-2.534,85.3],["Birdoswald",54.991,-2.602,91.7],["Carlisle",54.892,-2.932,112.7],["Burgh by Sands",54.921,-3.048,122.3],["Bowness-on-Solway",54.953,-3.212,135.2]]},{"id":"c2c","name":"Coast to Coast","blurb":"Wainwright’s walk across northern England, from the Irish Sea to the North Sea through the Lake District, the Dales and the North York Moors.","pts":[["St Bees",54.492,-3.594,0.0],["Ennerdale Bridge",54.524,-3.432,22.5],["Rosthwaite",54.523,-3.147,46.7],["Grasmere",54.459,-3.024,61.2],["Patterdale",54.531,-2.937,74.0],["Shap",54.532,-2.68,99.8],["Orton",54.468,-2.59,112.7],["Kirkby Stephen",54.472,-2.349,132.0],["Keld",54.405,-2.169,152.9],["Reeth",54.388,-1.943,170.6],["Richmond",54.403,-1.737,186.7],["Danby Wiske",54.371,-1.484,209.2],["Ingleby Cross",54.406,-1.309,223.7],["Clay Bank Top",54.423,-1.13,243.0],["Blakey Ridge",54.38,-0.958,257.5],["Glaisdale",54.439,-0.795,272.0],["Grosmont",54.436,-0.725,276.8],["Robin Hood’s Bay",54.434,-0.534,302.6]]},{"id":"pennine","name":"Pennine Way","blurb":"Britain’s first National Trail, up the backbone of England from the Peak District to the Scottish Borders.","pts":[["Edale",53.367,-1.816,0.0],["Crowden",53.491,-1.893,25.7],["Standedge",53.59,-1.958,43.5],["Hebden Bridge",53.742,-2.013,64.4],["Ponden",53.84,-2.023,78.9],["Ickornshaw",53.896,-2.044,91.7],["Gargrave",53.983,-2.105,112.7],["Malham",54.061,-2.15,122.3],["Horton-in-Ribblesdale",54.149,-2.293,144.8],["Hawes",54.304,-2.197,167.4],["Keld",54.405,-2.169,188.3],["Tan Hill",54.457,-2.163,194.7],["Middleton-in-Teesdale",54.626,-2.082,222.1],["Dufton",54.629,-2.488,254.3],["Alston",54.811,-2.438,286.5],["Greenhead",54.982,-2.534,312.2],["Bellingham",55.144,-2.255,347.6],["Byrness",55.314,-2.366,371.8],["Kirk Yetholm",55.547,-2.274,431.3]]},{"id":"lejog","name":"Land’s End to John o’Groats","blurb":"The classic end-to-end, the length of Great Britain by road from Cornwall to Caithness.","pts":[["Land’s End",50.066,-5.714,0.0],["Penzance",50.118,-5.537,16.8],["Truro",50.263,-5.051,62.8],["Bodmin",50.471,-4.718,102.7],["Launceston",50.636,-4.36,140.4],["Okehampton",50.739,-4.004,173.7],["Exeter",50.718,-3.534,213.7],["Taunton",51.015,-3.103,267.7],["Bridgwater",51.128,-3.003,285.1],["Bristol",51.455,-2.588,341.1],["Gloucester",51.864,-2.244,403.0],["Worcester",52.193,-2.221,447.2],["Bridgnorth",52.535,-2.419,495.9],["Shrewsbury",52.708,-2.754,531.7],["Whitchurch",52.969,-2.682,567.2],["Warrington",53.39,-2.597,624.1],["Preston",53.763,-2.703,674.9],["Lancaster",54.047,-2.801,713.7],["Kendal",54.328,-2.746,751.7],["Penrith",54.664,-2.752,796.8],["Carlisle",54.892,-2.932,830.4],["Gretna",54.995,-3.065,847.6],["Moffat",55.333,-3.442,901.4],["Edinburgh",55.953,-3.188,986.8],["Perth",56.396,-3.437,1049.1],["Pitlochry",56.703,-3.734,1095.7],["Aviemore",57.195,-3.825,1162.1],["Inverness",57.478,-4.224,1209.8],["Dingwall",57.596,-4.429,1231.5],["Tain",57.811,-4.055,1270.8],["Helmsdale",58.117,-3.65,1321.0],["Wick",58.438,-3.093,1379.3],["John o’Groats",58.644,-3.07,1407.0]]}];
+const WATER = { r: 'M752.5,1002.5L754.3,1003.4L755.9,1004.9L757.1,1007.5L757.6,1010.5L757.7,1014.4L759.8,1019.5L765.6,1023.0L766.8,1023.3L772.6,1022.8L773.9,1022.2L775,1020.4L775.6,1019.9L779,1020.7L784.1,1018.3L789.1,1018.3L792,1016.8L794.3,1017.8L795.1,1017.6L796.2,1016.1L797,1011.6L798.2,1010.0L799.4,1009.2L800.9,1009.2L802,1011.8L803.8,1013.3L804.8,1018.1L806.1,1019.5L805.6,1021.1L801.7,1022.9L802.8,1024.2L804.1,1024.6L806.4,1024.5L807.1,1023.0L807.7,1022.7L808.1,1025.0L812,1027.6L812.4,1031.7L810.7,1036.5L811.5,1039.0L813.7,1041.2L817.7,1042.6L821.2,1045.8L822.7,1045.6L826.4,1043.2L827.7,1041.6L828.6,1039.8L827.9,1037.5L827.7,1035.2L828,1034.9L830.4,1035.9L835,1034.3L835.9,1034.4L837,1033.7L838.6,1033.6L840,1034.0L840.7,1035.1L840.5,1037.3L839.7,1039.8L841.2,1041.3L842.3,1041.5L846,1041.3L847.6,1043.3L848,1045.0L847.8,1046.7L850.7,1048.0L854.7,1052.9L857.6,1052.7L860.9,1050.3L862.5,1051.9L864.1,1051.6L865.1,1049.6L864.3,1047.7L865.1,1046.7L864.2,1044.5L865,1043.6L868.3,1043.3L869.1,1042.3L869.8,1042.0L870.4,1042.4L871.5,1043.9L872.2,1044.2L873.5,1043.9L876.3,1042.0L878.5,1039.6L879.6,1039.3L882.6,1040.9L884.6,1041.3L886.4,1040.3L888.2,1041.6L894.7,1040.0L895.9,1040.7L898.2,1043.2L902.8,1045.1L905.9,1044.3L906.9,1046.3L908.1,1046.6L909.9,1045.8M582.8,411.9L593.5,400.3L604.2,384.5M604.3,384.4L611.6,376.6L611.9,373.3M572.5,427.2L563.8,436.3M582.8,411.9L572.5,427.2M745.2,869.2L743.2,873.8L744,878.9L755.9,894.3L762.2,899.2L773.2,901.1L784.2,888.6L795.8,888.8L803.4,885.2L811.1,877.6L817.1,877.1L833.2,859.6L836.9,837.7L833.2,824.7L837.3,813.2L839.4,796.6M646.5,926.1L649.4,927.2L653.2,932.2L658.2,934.6L661.1,934.3L665.4,926.6L673.2,926.3L676.4,924.3L688.4,901.9L699.5,903.8L704.6,902.3L704.8,904.6L708.7,905.0L714.9,913.7L724.6,913.6L731.6,937.1L737.9,948.1L740.9,965.0L740.5,973.0L745.9,986.0L738.9,995.9L738.7,999.7L737,1002.2L733.9,1002.7L730.5,1009.7M563.8,436.3L554.1,448.6M808.4,989.3L812.9,988.9L819.4,990.8L829.8,977.7L835,974.6L838.4,968.0L843.5,966.2L847.5,960.8L850.6,961.6L852.1,969.7L857,969.5L864,966.5L873.7,947.8L877.6,947.1L882.5,949.2L904.7,921.4L908.5,915.4L909.9,899.4M659.8,601.8L659.1,598.8L663.4,593.2L667.3,583.4L675.3,577.8L680.6,578.0L687.5,581.2L696.2,581.7L701.3,585.2L709.5,582.8L715.1,585.6L722.4,585.1L734.9,578.8L740,578.6L744.9,570.8L749.8,566.7L750.7,563.0L754.3,561.3M713.9,1004.7L713.9,1004.8M713.9,1004.7L711.7,1010.3L712.7,1027.6M665.9,935.6L669.6,940.9L671.1,954.5L670.5,956.6L667.5,955.5L664.8,958.5L663.3,965.2L667.3,968.4L668.7,973.0L675.2,980.1L682.6,975.1L685.2,970.8L705.8,978.6L712.2,979.5L715.5,983.5L713.5,988.5L716.8,993.1L715.7,1003.0L714.6,1001.3L713.9,1004.7M740.6,712.6L741.8,714.8L750.3,719.7L762.9,719.4L770.3,716.2L776.4,717.1L784.1,721.3L790.9,732.0L792.9,740.2L798.4,745.4L799.6,752.3L813.6,766.5L814.4,770.8L812.9,776.9L817.1,785.0L828.6,792.6L830.3,795.4L838.1,795.6M466.3,679.4L466.7,670.2L464.9,662.3M576.5,471.4L589,463.2L598.7,462.7M614,461.3L637.8,458.5L643.3,459.4L648.7,464.7L654.3,474.9L657,477.0L666.2,479.5L661.5,490.4L664.2,496.0L670.2,498.9M464.9,701.3L469,698.9L470.2,691.1L465,683.7L466.3,679.4M598.7,462.7L614,461.3', l: 'M463,685.4L464.2,680.0L465.9,679.1L466.8,679.9L466.9,683.4L470.1,684.6L472.4,684.4L479.2,681.7L480.4,681.9L481.7,683.7L481.4,686.2L478.2,689.5L476.7,694.2L477.3,694.7L479.6,694.4L479.9,697.4L476.8,700.4L475.2,700.6L475.6,702.8L473.9,704.3L475.5,706.5L472.3,708.3L470.5,708.0L468.6,705.8L462.1,706.0L458.2,703.7L457.6,702.6L457.8,701.1L459.9,700.1L463.8,694.0L464.2,691.4L463,685.4ZM604.3,384.4L604.7,386.7L600.8,390.3L593,402.1L590.7,403.4L587.4,408.1L583.1,412.5L582.6,410.9L594.5,398.2L597.9,391.7L599.9,390.5L604.3,384.4ZM568.8,432.1L563.8,436.5L563.5,434.6L566.1,432.5L570.6,426.9L572.5,427.2L568.8,432.1ZM586.1,301.0L579.3,297.0L578.5,295.8L587,299.9L590.1,303.0L591.5,303.1L593.9,305.0L598.9,310.2L598.8,313.1L592,305.8L586.1,301.0ZM540.7,357.7L533.8,353.5L532.2,351.4L529.5,352.0L528.1,351.4L526.1,348.3L526.6,346.4L536.5,353.3L540.7,357.7ZM514.7,454.9L514.7,454.2L518,454.5L532.3,443.3L520.4,454.3L517.3,455.3L514.7,454.9ZM598.7,452.8L597.1,456.6L596.6,454.0L597.2,452.0L604.6,441.0L606.4,439.2L603.1,446.2L598.7,452.8ZM612.4,462.1L602.1,463.0L598.2,462.6L609.3,460.7L612.8,460.4L614,461.2L612.4,462.1ZM557.2,498.4L549,503.0L543.8,512.9L538.6,517.2L536.9,517.5L542.5,512.5L543.7,509.3L548.9,501.6L552.4,499.9L557.8,495.5L559,495.9L557.2,498.4ZM607.3,486.5L607,485.8L608.5,484.9L615.7,481.7L622,474.8L625.6,474.3L625,475.2L621.1,476.6L617.9,481.4L615.4,483.6L607.3,486.5ZM592.9,530.9L592.7,532.1L588.5,534.7L588.4,537.7L587.1,537.0L585.4,533.8L585,526.5L583.2,520.5L581.1,517.0L580.9,505.4L582.5,512.2L582.5,517.1L586.4,524.5L587.7,524.9L592.9,530.9ZM462.9,860.9L464.6,856.5L464.4,855.3L461.4,858.0L460.9,857.5L463.9,853.2L465.3,851.7L466.6,851.7L464.6,852.7L464.5,853.8L467.4,857.1L466.4,859.0L462.9,860.9Z' }; // main rivers and lochs, same projection
+const COAST = { d: 'M480,751L490,761L487,765L474,761L473,772L475,776L481,777L482,801L492,812L489,822L485,822L489,824L489,829L494,831L493,833L489,830L483,835L491,842L490,848L495,861L494,873L498,878L489,894L483,911L484,924L474,939L474,947L467,945L467,943L465,944L471,953L473,949L472,952L477,958L473,965L471,964L472,961L460,965L451,961L445,961L448,956L443,958L444,964L437,971L439,966L433,953L435,965L431,970L426,970L428,966L426,966L426,968L420,970L404,971L396,976L394,974L392,978L397,979L394,986L387,988L386,991L379,990L378,987L376,993L373,995L375,998L367,1001L367,1005L352,1007L357,1001L356,997L341,997L347,1000L345,1004L349,1004L349,1011L340,1019L337,1017L337,1021L336,1018L335,1018L332,1018L336,1019L334,1028L331,1024L319,1024L323,1026L323,1032L313,1030L308,1037L304,1034L295,1034L296,1036L291,1038L289,1042L286,1040L279,1044L283,1037L277,1041L277,1035L275,1034L264,1041L261,1038L258,1044L250,1047L249,1042L268,1028L248,1035L265,1023L274,1020L275,1016L269,1015L267,1011L268,1016L263,1020L247,1023L237,1030L229,1031L229,1028L235,1026L233,1022L238,1021L241,1018L239,1017L240,1015L246,1011L245,1014L247,1013L248,1010L252,1011L251,1009L256,1003L266,999L247,1007L246,1005L230,1014L224,1009L227,1006L223,1002L217,1009L217,1002L213,1002L213,998L222,995L219,990L221,986L236,980L240,975L243,978L245,970L253,971L252,970L254,968L241,969L242,973L239,970L227,973L221,970L219,971L221,973L215,971L216,973L210,974L208,972L209,965L212,963L215,965L215,960L228,953L228,959L232,958L236,955L235,950L238,951L238,957L242,958L247,959L250,956L256,957L247,955L246,952L248,953L248,951L250,950L249,943L242,939L258,931L262,932L259,930L261,921L286,921L300,915L303,916L306,912L319,910L306,908L307,899L302,902L294,916L285,919L282,918L285,914L275,917L266,911L268,914L258,918L258,920L243,923L250,919L263,904L271,901L272,896L280,881L272,880L286,857L293,861L299,860L295,856L303,857L300,854L304,854L307,857L306,854L310,849L300,849L306,847L304,846L307,844L302,843L270,848L267,844L267,841L264,847L263,838L267,836L264,833L268,831L263,831L262,837L261,830L255,839L251,840L245,838L246,834L252,830L250,829L252,827L248,830L248,825L244,826L241,831L235,828L227,828L229,824L235,823L233,820L237,821L238,820L232,819L229,813L225,813L227,812L232,812L231,810L234,810L238,813L240,811L236,807L247,805L250,806L258,807L245,802L245,789L267,785L263,783L267,777L265,777L267,774L254,774L244,778L242,776L245,771L244,767L247,767L252,772L252,768L250,767L245,759L249,750L246,750L244,755L241,754L239,751L245,749L240,742L243,741L238,738L236,744L233,745L234,752L231,752L235,738L231,736L234,732L239,728L240,731L246,732L243,737L240,735L240,737L244,740L249,732L254,734L252,731L254,731L250,729L249,726L278,729L282,727L287,732L289,731L290,738L294,746L295,739L300,730L307,730L313,733L324,732L331,740L335,739L328,734L330,731L338,732L331,728L334,726L325,725L325,722L337,714L338,709L339,713L354,706L350,704L357,693L359,695L360,690L349,695L348,691L338,699L343,695L341,691L338,695L336,692L331,695L324,693L317,689L316,685L327,677L338,678L334,675L342,677L332,671L336,667L347,670L343,667L344,664L348,664L346,662L341,664L339,660L339,657L344,657L338,651L341,651L345,644L347,647L350,633L359,633L358,637L369,626L371,628L368,632L374,630L374,634L377,632L375,635L377,636L379,633L377,627L381,622L380,629L386,632L387,640L389,635L387,627L387,632L381,628L383,622L390,620L399,638L391,645L396,646L389,656L402,646L403,635L397,627L399,619L402,619L402,617L406,619L410,616L412,620L416,619L408,608L419,613L424,619L436,624L436,627L421,635L416,645L429,646L435,629L448,631L466,623L482,628L491,627L495,632L493,643L499,646L498,653L505,658L510,671L516,675L510,668L513,667L517,674L515,681L504,687L502,692L503,695L513,687L525,687L527,689L534,708L531,722L528,725L525,717L527,711L525,703L516,698L516,703L521,705L519,706L521,713L516,723L524,720L526,729L519,737L514,735L506,737L504,751L495,758L491,758L492,756ZM243,769L241,776L235,772L234,766L221,764L226,761L230,762L240,760ZM449,482L439,490L435,488L433,484L449,479ZM468,463L457,476L453,477L452,474L459,467ZM481,431L475,435L468,428L476,422L481,425ZM408,430L403,435L397,434L404,422ZM420,394L416,402L410,401L415,404L416,408L415,412L413,411L410,412L415,412L419,416L410,417L403,402L407,394L405,385L410,383L416,387L413,387L418,390L416,391L407,386ZM409,374L419,377L416,378L419,382L412,383L406,379ZM427,360L419,357L423,363L426,362L423,366L417,367L416,365L412,367L424,368L422,371L417,372L412,371L410,368L412,367L397,362L402,355L408,355L407,358L412,352L411,355L416,356L415,355L421,352L420,355L428,356ZM434,347L424,335L427,338L434,332L438,332L435,329L438,327L443,328L441,326L443,324L425,318L437,311L429,313L431,308L428,310L425,306L425,297L431,296L429,295L429,291L439,293L437,294L442,305L441,296L446,294L450,298L451,296L444,285L451,279L461,276L481,260L486,270L483,276L486,278L474,291L480,293L487,288L487,293L482,297L471,294L473,301L457,307L471,305L474,311L471,312L474,313L470,317L462,315L468,320L464,324L462,323L461,326L456,322L457,326L451,317L454,312L459,311L453,311L448,317L454,330L446,328L445,330L449,336L447,338L442,336L441,342ZM624,840L614,849L608,856L600,859L602,853L598,856L594,854L590,843L590,830L599,826L605,827L609,829L613,840L619,838ZM582,753L575,755L581,738L587,733L594,719L604,716L602,724L606,730L601,738L601,741L587,756ZM557,600L548,602L539,597L536,579L543,571L549,573L552,578L553,585L556,588L554,593L557,594ZM495,575L477,586L477,581L481,577L476,569L481,565L476,564L465,576L465,571L468,565L466,563L468,556L476,552L477,560L478,554L489,546ZM561,570L550,555L549,550L551,548L560,560ZM517,527L505,552L501,555L500,561L493,561L492,549L505,542L498,543L500,536L516,523ZM519,495L514,494L511,499L516,497L516,499L510,504L505,503L505,500L493,507L482,508L480,510L476,509L474,504L476,501L478,501L481,505L481,503L496,497L487,500L484,497L489,490L496,488L497,485L496,484L489,487L486,482L477,480L475,478L478,476L476,472L482,472L487,467L493,468L500,481L510,482L520,490L520,492L517,491ZM452,388L447,378L450,378L450,371L458,379L456,372L461,372L455,367L456,361L467,371L470,371L469,374L471,370L477,377L472,367L474,362L471,362L470,356L477,350L487,363L489,375L485,384L489,383L488,389L491,391L487,394L494,394L492,397L497,396L504,401L512,397L520,399L519,405L511,410L510,415L501,424L497,425L495,421L498,415L507,407L498,409L494,403L496,407L491,414L490,407L487,406L486,408L477,410L479,406L475,407L473,404L475,401L471,401L466,394L470,391L477,395L476,394L471,389L467,390L466,384L463,386L463,382L460,391ZM496,377L497,371L498,373L496,382L498,390L494,392L493,380ZM816,1132L810,1135L810,1140L802,1143L789,1133L784,1134L788,1129L795,1127L801,1122L813,1126ZM935,1054L933,1050L935,1046L943,1050L946,1054L944,1056ZM710,1031L695,1036L693,1034L680,1046L679,1052L656,1052L648,1043L643,1042L637,1027L628,1028L628,1034L625,1035L619,1033L614,1036L608,1034L608,1028L611,1024L612,1027L621,1025L622,1021L606,1021L602,1015L606,1015L603,1014L603,1008L601,1011L598,1010L599,1013L597,1014L585,1015L580,1024L571,1025L566,1030L554,1021L572,1017L570,1011L573,1008L566,1010L568,1011L568,1016L552,1016L550,1020L546,1015L555,1010L554,1001L548,999L542,1000L543,995L554,990L557,982L572,983L572,979L580,972L583,974L583,971L585,970L594,970L606,961L619,944L623,926L630,924L623,925L618,918L623,907L627,903L623,905L617,895L619,892L618,886L621,882L600,886L595,890L593,897L588,894L577,897L588,882L603,870L604,861L606,862L615,849L637,841L634,836L645,842L652,841L670,834L685,848L686,843L679,830L687,825L699,842L706,840L711,834L704,838L696,835L685,812L698,792L692,792L688,788L687,773L700,766L702,761L698,762L696,758L704,748L701,741L703,739L704,735L695,745L691,745L688,738L682,755L676,750L678,733L676,740L671,741L665,731L664,724L650,705L658,682L663,678L666,664L675,662L671,660L673,657L677,656L683,658L690,656L685,656L690,654L659,652L657,654L654,651L654,664L639,667L638,664L636,668L638,671L626,677L623,675L622,670L621,676L619,676L613,670L614,666L609,669L600,661L600,668L604,674L604,684L602,687L594,684L588,676L571,666L565,673L571,692L565,689L565,681L552,664L551,650L555,648L558,659L561,661L563,658L559,648L561,635L570,626L573,614L587,596L582,590L582,584L574,580L567,572L571,567L569,549L575,544L595,548L583,544L576,538L572,531L576,541L571,541L571,532L578,517L571,527L569,520L567,521L569,541L565,540L567,544L564,553L559,552L554,539L556,551L551,547L550,543L546,552L549,558L542,555L540,540L549,526L555,523L559,516L566,512L567,509L558,514L555,520L539,534L538,539L533,537L532,545L541,564L534,571L530,579L532,585L529,597L524,603L528,611L522,617L513,618L511,616L511,607L516,601L518,576L532,557L523,566L519,562L518,557L525,547L518,552L517,549L525,535L521,537L516,546L525,529L527,530L526,525L529,519L523,524L526,514L530,511L524,512L525,503L527,500L533,500L527,500L532,491L548,490L554,483L558,477L549,488L537,489L535,484L532,487L534,480L539,482L546,477L538,481L535,479L543,468L541,466L562,460L551,462L546,460L554,449L518,484L512,480L513,476L511,479L507,478L497,471L497,468L501,467L508,470L506,466L513,462L520,464L527,462L521,463L513,460L504,465L491,462L487,464L483,462L482,459L499,452L507,457L505,452L513,452L507,447L514,446L519,442L514,445L511,444L514,440L502,440L507,439L505,437L508,429L513,425L519,431L525,430L528,428L521,429L518,427L516,423L511,423L512,420L516,415L520,414L526,417L536,417L527,417L518,411L521,404L520,402L524,399L536,403L529,397L533,393L524,397L515,395L520,389L522,390L529,387L533,381L525,388L520,387L522,382L516,388L510,389L509,379L506,378L505,373L508,364L520,371L520,369L529,368L524,366L519,368L510,357L511,351L514,350L517,351L518,349L510,346L509,336L512,332L517,332L519,340L523,343L521,340L524,341L524,336L520,329L522,325L526,326L526,330L530,333L532,333L535,327L548,334L536,326L538,323L557,336L556,331L548,326L549,321L538,314L534,314L533,308L534,306L538,310L542,309L543,302L546,301L540,297L536,288L543,290L553,287L566,292L563,289L567,288L559,288L551,278L553,271L561,274L558,270L556,271L555,268L559,267L562,268L555,261L560,256L563,247L572,250L574,259L576,249L584,255L577,267L587,259L589,253L596,254L599,259L594,267L604,257L611,259L612,256L621,254L625,251L626,254L633,254L652,247L657,250L668,250L668,248L664,244L667,242L669,245L678,243L690,246L683,260L683,263L688,265L683,276L677,283L666,288L658,298L639,311L636,317L627,321L626,324L621,321L627,327L626,332L607,332L601,327L607,334L613,333L624,337L628,335L632,338L640,332L641,333L627,351L625,351L624,346L621,347L616,352L607,353L600,361L599,364L613,353L620,355L626,352L620,364L615,367L610,367L613,368L610,373L614,374L624,366L621,363L637,362L651,355L649,357L653,357L652,354L656,355L659,349L665,348L673,348L689,354L697,350L728,354L737,351L742,353L749,350L756,350L767,360L771,376L757,393L751,409L753,415L744,430L744,438L735,450L728,456L723,474L709,487L687,489L676,499L670,499L676,500L699,489L704,492L702,499L704,501L713,504L718,509L714,514L705,518L693,517L683,526L681,533L669,537L648,534L637,528L649,539L670,540L686,546L695,543L703,533L715,533L719,537L718,539L723,539L736,547L747,549L768,581L770,579L771,583L780,586L787,633L797,655L803,679L809,684L810,690L807,693L811,694L811,690L834,700L849,709L856,721L861,735L867,738L870,744L880,750L874,753L871,760L875,774L894,802L895,806L894,810L892,811L893,805L887,802L879,803L868,792L850,795L844,792L838,796L840,797L845,794L851,798L867,795L873,805L895,821L899,827L907,848L908,857L906,864L895,873L886,886L892,886L901,896L906,896L910,899L916,881L922,877L929,875L948,879L951,878L948,876L967,882L991,899L998,915L1000,931L990,955L987,976L980,979L971,992L967,986L960,982L967,987L967,990L954,990L968,991L963,999L967,1000L968,998L968,1002L961,1008L954,1010L948,1002L942,1013L930,1016L934,1019L945,1013L947,1021L944,1027L947,1028L945,1031L935,1037L927,1037L915,1040L910,1046L920,1042L930,1043L932,1047L922,1050L922,1052L931,1053L932,1050L934,1056L948,1057L956,1055L979,1054L977,1059L974,1060L976,1072L975,1079L962,1087L954,1089L948,1098L948,1105L934,1104L925,1112L909,1116L903,1124L868,1115L859,1118L836,1121L834,1126L827,1122L829,1118L824,1114L819,1114L815,1121L816,1114L810,1114L812,1116L811,1121L790,1105L800,1119L786,1123L784,1128L776,1125L765,1127L760,1131L753,1125L750,1130L753,1128L759,1132L760,1136L758,1141L752,1141L730,1136L726,1140L728,1146L726,1149L725,1142L711,1130L700,1126L674,1132L667,1139L661,1132L663,1140L658,1150L660,1156L655,1159L660,1163L657,1169L654,1168L650,1173L648,1183L640,1184L629,1172L623,1174L619,1170L620,1166L615,1165L614,1161L616,1156L614,1156L612,1163L608,1163L614,1166L612,1166L615,1168L614,1172L605,1166L594,1171L583,1172L582,1169L577,1172L575,1182L565,1185L562,1192L561,1186L558,1186L559,1192L554,1197L557,1198L558,1201L549,1212L542,1199L531,1193L527,1195L525,1201L516,1202L518,1190L529,1183L534,1186L537,1181L541,1179L552,1169L552,1163L559,1160L561,1148L565,1145L566,1150L572,1150L567,1146L567,1142L575,1141L578,1133L589,1121L592,1095L605,1097L613,1088L610,1079L613,1079L612,1075L641,1069L663,1073L666,1076L689,1072L690,1075L690,1060L692,1060L693,1053L711,1039L720,1023L731,1010L725,1014ZM699,224L695,236L690,227L693,226L689,225ZM672,230L667,220L663,220L664,216L669,214L675,217L680,225L675,229L683,227L681,229ZM708,215L702,219L696,216L692,210L683,215L678,215L676,211L676,201L673,204L674,209L670,210L667,204L670,192L676,189L686,191L691,199L683,205L687,207L690,204L693,206L695,204L700,209L705,207L702,211L704,214L704,211L710,209ZM717,198L716,194L711,196L716,191L713,188L716,188L719,190L718,192L721,191L722,195ZM685,185L694,185L693,191L685,190ZM702,186L705,178L707,178L709,181L707,184L708,189L706,190ZM727,174L723,180L722,178L718,181L719,178L717,178L711,184L717,176L716,173L722,172L719,176L729,170L730,174ZM686,169L695,166L692,170L698,172L702,178L699,180L699,177L696,174L693,173L694,176L691,176ZM818,44L813,53L816,50L816,54L809,56L816,59L811,62L815,64L811,67L808,64L808,67L806,68L809,69L808,72L810,69L808,75L810,73L812,78L807,82L810,88L806,90L807,96L804,95L803,111L800,109L801,107L796,105L800,100L798,97L800,97L803,82L803,74L800,74L803,67L799,72L797,67L794,66L798,71L795,71L791,77L786,73L790,70L788,67L786,71L785,69L780,70L776,63L779,60L785,62L789,59L790,63L793,58L797,63L798,56L804,55L798,50L795,51L796,47L792,46L792,40L789,43L789,40L781,41L786,32L791,38L796,37L789,34L794,30L793,27L800,28L801,23L799,40L801,40L796,50L805,45L801,42L803,40L804,43L806,39L811,46L806,49L810,49L811,51ZM818,21L820,26L816,26L820,30L818,33L819,38L814,37L814,40L812,39L809,25L811,22L814,26L814,13L816,14L821,13L821,24ZM823,18L828,0L830,3L828,6L832,0L835,2L836,5L830,14L831,19Z', minx: -885.059, miny: -6773.587, w: 999.6, h: 1217.6, k: 0.580703 };
+const jById = id => JOURNEYS.find(j => j.id === id);
+const jLen = j => j.pts[j.pts.length - 1][3];
+/* Mountain walks carry a height profile, prof = [[km along the route, metres above sea level], ...], built
+ * from well-known landmark heights (car parks, cols, lochans, summits), so it's approximate. The gradient
+ * of each stretch can drive the treadmill's incline (settings.terrain, capped at settings.terrainMax). */
+const jEle = (j, km) => { const p = j.prof; if (!p) return null; if (km <= p[0][0]) return p[0][1];
+  for (let i = 1; i < p.length; i++) if (km <= p[i][0]) return p[i - 1][1] + (p[i][1] - p[i - 1][1]) * (km - p[i - 1][0]) / (p[i][0] - p[i - 1][0]);
+  return p[p.length - 1][1]; };
+// gradient in % of the stretch you're on (looking 20 m ahead so the treadmill starts moving as you reach it)
+const jGrade = (j, km) => { const p = j.prof; if (!p) return 0; const k = km + .02;
+  for (let i = 1; i < p.length; i++) if (k <= p[i][0]) return (p[i][1] - p[i - 1][1]) / ((p[i][0] - p[i - 1][0]) * 10);
+  return 0; };
+const jAscent = j => j.prof ? j.prof.reduce((s, x, i, a) => i ? s + Math.max(0, x[1] - a[i - 1][1]) : 0, 0) : 0;
+// the next summit or top ahead of a point, for "312 m to climb to the summit"
+const jNextTop = (j, km) => { const p = j.prof; if (!p) return null;
+  for (let i = 1; i < p.length; i++) if (p[i][0] > km && (i === p.length - 1 || p[i + 1][1] < p[i][1]) && p[i][1] > p[i - 1][1]) return { km: p[i][0], ele: p[i][1] };
+  return null; };
+function jProfile(j, km){
+  const p = j.prof, W = 320, H = 90, pt = 8, pb = 14, len = jLen(j);
+  const lo = Math.min(...p.map(x => x[1])), hi = Math.max(...p.map(x => x[1])), span = Math.max(100, hi - lo);
+  const X = k => (k / len * W).toFixed(1), Y = e => (pt + (H - pt - pb) * (1 - (e - lo) / span)).toFixed(1);
+  const line = p.map(x => `${X(x[0])},${Y(x[1])}`).join(' ');
+  const done = p.filter(x => x[0] < km).map(x => `${X(x[0])},${Y(x[1])}`).concat([`${X(km)},${Y(jEle(j, km))}`]);
+  const peak = p.reduce((a, b) => b[1] > a[1] ? b : a);
+  return `<svg viewBox="0 0 ${W} ${H}" class="jprof" role="img" aria-label="Height profile, ${Math.round(hi)} m at the top">
+    <polygon points="0,${H - pb} ${line} ${W},${H - pb}" class="jparea"/><polyline points="${line}" class="jpline"/>
+    ${km > 0 ? `<polygon points="0,${H - pb} ${done.join(' ')} ${X(km)},${H - pb}" class="jpdone"/>` : ''}
+    <line x1="${X(km)}" x2="${X(km)}" y1="${pt - 4}" y2="${H - pb}" class="jpnow"/><circle cx="${X(km)}" cy="${Y(jEle(j, km))}" r="4" class="jpdot"/>
+    <text x="${X(peak[0])}" y="${(+Y(peak[1]) - 2).toFixed(1)}" class="ax" text-anchor="middle">${Math.round(peak[1])} m</text>
+    <text x="2" y="${H - 3}" class="ax">${Math.round(p[0][1])} m</text><text x="${W - 2}" y="${H - 3}" class="ax" text-anchor="end">${kmU(len, 1)}</text></svg>`;
+}
+const jXY = (lat, lon) => [lon * 111.32 * COAST.k - COAST.minx, -lat * 111.32 - COAST.miny];
+function jState(pid = profiles.current){
+  const ps = pid === profiles.current ? settings : rawGet(SKEY, pid, {}), a = ps.journey, j = a && jById(a.id);
+  if (!j || !(a.start > 0)) return null;
+  const runs = (pid === profiles.current ? store.get(KEY, []) : profileRuns(pid)).filter(r => r.date >= a.start).sort((x, y) => x.date - y.date);
+  const km = runs.reduce((s, r) => s + r.dist, 0) / 1000, len = jLen(j);
+  // when each milestone was passed, from the runs in order
+  const reached = [], tot = { v: 0 };
+  runs.forEach(r => { tot.v += r.dist / 1000; j.pts.forEach((p, i) => { if (i && reached[i] == null && tot.v >= p[3]) reached[i] = r.date; }); });
+  reached[0] = a.start;
+  const passed = j.pts.filter(p => km >= p[3]).length - 1;   // milestones passed, not counting the start
+  return { j, a, km: Math.min(km, len), len, passed, next: j.pts[passed + 1] || null, done: km >= len, reached, ps };
+}
+// where on the map a distance along the route is
+function jPos(j, km){
+  const p = j.pts; if (km <= 0) return jXY(p[0][1], p[0][2]);
+  for (let i = 1; i < p.length; i++) if (km <= p[i][3]){
+    const f = (km - p[i - 1][3]) / (p[i][3] - p[i - 1][3]), a = jXY(p[i - 1][1], p[i - 1][2]), b = jXY(p[i][1], p[i][2]);
+    return [a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f];
+  }
+  return jXY(p[p.length - 1][1], p[p.length - 1][2]);
+}
+function jMap(st, others){
+  const j = st.j, xy = j.pts.map(p => jXY(p[1], p[2]));
+  let x0 = Math.min(...xy.map(p => p[0])), x1 = Math.max(...xy.map(p => p[0])), y0 = Math.min(...xy.map(p => p[1])), y1 = Math.max(...xy.map(p => p[1]));
+  // pad the route and keep the view at least 4:3 wide, so short routes get some surrounding country
+  // short city routes stay zoomed in
+  const pad = Math.max(x1 - x0, y1 - y0) * .16 + 1.5; x0 -= pad; x1 += pad; y0 -= pad; y1 += pad;
+  // keep the view between 4:3 and 4:5, so long thin routes still show the country around them
+  const w = x1 - x0, h = y1 - y0;
+  if (w < h * .8){ const d = h * .8 - w; x0 -= d / 2; x1 += d / 2; }
+  if (h < w * .62){ const d = w * .62 - h; y0 -= d / 2; y1 += d / 2; }
+  const W = x1 - x0, H = y1 - y0, s = W / 320; // s: map units per screen-ish pixel, so dots and text stay the same size on every route
+  const line = pts => pts.map(p => p[0].toFixed(1) + ',' + p[1].toFixed(1)).join(' ');
+  const doneXY = xy.slice(0, st.passed + 1).concat([jPos(j, st.km)]);
+  const loop = j.pts[0][0] === j.pts[j.pts.length - 1][0];   // a loop like the Three Peaks finishes where it starts
+
+  let svg = `<svg viewBox="${x0.toFixed(1)} ${y0.toFixed(1)} ${W.toFixed(1)} ${H.toFixed(1)}" class="jmap" role="img" aria-label="Map of ${esc(j.name)} showing your progress">
+    <rect x="${x0}" y="${y0}" width="${W}" height="${H}" class="jsea"/><path d="${COAST.d}" class="jland" stroke-width="${(s * .8).toFixed(2)}"/><path d="${WATER.l}" class="jlake"/><path d="${WATER.r}" class="jriver" vector-effect="non-scaling-stroke"/>
+    <polyline points="${line(xy)}" class="jroute" stroke-width="${(s * 2.2).toFixed(2)}" stroke-dasharray="${(s * 4).toFixed(1)} ${(s * 3).toFixed(1)}"/>
+    <polyline points="${line(doneXY)}" class="jdone" stroke-width="${(s * 3.4).toFixed(2)}"/>`;
+  xy.forEach((p, i) => { if (loop && i === xy.length - 1) return; svg += `<circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="${(s * (i === 0 || i === xy.length - 1 ? 3.6 : 2.4)).toFixed(2)}" class="${i <= st.passed ? 'jpt on' : 'jpt'}"/>`; });
+  // labels sit above their dot, and towards the middle of the map so they're never cut off at an edge
+  // labels go on the side away from refX (the next point along, or your marker), flipped if they'd run off the map
+  const label = (i, below, refX) => { const p = xy[i], tw = j.pts[i][0].length * s * 6.2, gap = s * (below ? 13 : 6);
+    let end = refX > p[0];
+    if (!end && p[0] + gap + tw > x1) end = true; else if (end && p[0] - gap - tw < x0) end = false;
+    return `<text x="${(p[0] + (end ? -1 : 1) * gap).toFixed(1)}" y="${(p[1] + (below ? s * 21 : -s * 8)).toFixed(1)}" font-size="${(s * 11).toFixed(1)}" text-anchor="${end ? 'end' : 'start'}" class="jlab">${esc(j.pts[i][0])}</text>`; };
+  svg += label(0, false, xy[1][0]) + (loop ? '' : label(xy.length - 1, false, xy[xy.length - 2][0]));
+  const nextI = st.next && st.passed + 1 < xy.length - 1 ? st.passed + 1 : -1;
+  if (nextI > 0) svg += label(nextI, true, jPos(j, st.km)[0]);
+  // mountain walks: always name the summit (the highest stop)
+  if (j.prof){ let top = 0; j.pts.forEach((p, i) => { if (jEle(j, p[3]) > jEle(j, j.pts[top][3])) top = i; });
+    if (top > 0 && top < xy.length - 1 && top !== nextI){
+      const p = xy[top], tw = j.pts[top][0].length * s * 6.2, cx = Math.min(x1 - tw / 2 - s * 3, Math.max(x0 + tw / 2 + s * 3, p[0]));
+      svg += `<text x="${cx.toFixed(1)}" y="${(p[1] - s * 14).toFixed(1)}" font-size="${(s * 11).toFixed(1)}" text-anchor="middle" class="jlab">▲ ${esc(j.pts[top][0])}</text>`;
+    } }  // next stop, below the line so it clears your marker
+  // everyone else in the household on the same journey, then you on top
+  others.forEach(o => { const p = jPos(j, o.km); svg += `<g class="jme other"><circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="${(s * 8).toFixed(2)}" stroke-width="${(s * 1.6).toFixed(2)}"/><text x="${p[0].toFixed(1)}" y="${(p[1] + s * 3.8).toFixed(1)}" font-size="${(s * 10).toFixed(1)}">${esc(initial(o.p.name))}</text></g>`; });
+  const me = jPos(j, st.km);
+  svg += `<g class="jme"><circle cx="${me[0].toFixed(1)}" cy="${me[1].toFixed(1)}" r="${(s * 9).toFixed(2)}" stroke-width="${(s * 1.8).toFixed(2)}"/><text x="${me[0].toFixed(1)}" y="${(me[1] + s * 4).toFixed(1)}" font-size="${(s * 11).toFixed(1)}">${esc(initial(curProfile().name))}</text></g>`;
+  return svg + '</svg>';
+}
+const initial = n => (String(n || '?').trim()[0] || '?').toUpperCase();
+const kmU = (km, dp = 1) => `${fD(km * 1000, dp)} ${dU()}`;
+function renderJourney(){
+  const box = $('#jrBox'); if (!box) return;
+  const st = jState();
+  if (!st){
+    const doneN = (settings.journeysDone || []).length;
+    box.innerHTML = `<p class="muted">Run along a real route. Every run moves you further, with a celebration at each town you pass.${doneN ? ` You’ve finished ${doneN} journey${doneN === 1 ? '' : 's'} so far.` : ''}</p>
+      <div class="row"><button class="sm primary" data-jr="pick">Choose a journey</button></div>`;
+    return;
+  }
+  const others = profiles.list.filter(p => p.id !== profiles.current).map(p => { const o = jState(p.id); return o && o.j.id === st.j.id ? { p, km: o.km } : null; }).filter(Boolean);
+  const pct = st.km / st.len * 100, last = st.j.pts[st.passed];
+  const days = Math.max(1, Math.round((Date.now() - st.a.start) / DAY));
+  box.innerHTML = `<div class="jhead"><strong>${esc(st.j.name)}</strong><span class="muted">${kmU(st.km)} of ${kmU(st.len)}</span></div>
+    <div class="prog jprog" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(pct)}" aria-label="Journey progress"><i style="width:${pct.toFixed(1)}%"></i></div>
+    <p>${st.done ? `🏁 <strong>Journey complete!</strong> Finished in ${days} day${days === 1 ? '' : 's'}.`
+      : `${st.passed ? `📍 Past <strong>${esc(last[0])}</strong>. ` : `📍 Setting off from <strong>${esc(last[0])}</strong>. `}Next: ${esc(st.next[0])} in ${kmU(st.next[3] - st.km)}.`}</p>
+    <div class="jwrap">${jMap(st, others)}</div>
+    ${st.j.prof ? `<div class="jterr">${jProfile(st.j, st.km)}
+      ${(() => { const top = jNextTop(st.j, st.km); return !st.done && top ? `<p class="muted">⛰ ${Math.max(0, Math.round(top.ele - jEle(st.j, st.km)))} m of climbing to the next top, ${kmU(top.km - st.km)} away.</p>` : ''; })()}
+      <label class="check"><input type="checkbox" id="jTerrain"${settings.terrain ? ' checked' : ''}><span>Move the treadmill incline to follow the hills</span></label>
+      <label class="f jmax"><span>Steepest incline</span><select id="jTerrainMax">${[4, 6, 8, 10, 12, 15].map(v => `<option value="${v}"${(settings.terrainMax || 8) === v ? ' selected' : ''}>${v}%</option>`).join('')}</select></label>
+      <p class="fhint">Steeper stretches are held at this. Downhills run flat. Needs Treadmill control on in Settings; a workout’s own inclines take priority, and if you change the incline yourself it stays until the next stretch. Heights are approximate.</p>
+    </div>` : ''}
+    ${others.length ? `<p class="muted jothers">${others.map(o => `${esc(o.p.name)}: ${kmU(o.km)}`).join(', ')}</p>` : ''}
+    <details class="sect" data-sect="jstops"${sectOpen('jstops', false) ? ' open' : ''}><summary>Stops<span class="count">${st.passed}/${st.j.pts.length - 1}</span></summary><div class="sbody"><ol class="jstops">
+      ${st.j.pts.map((p, i) => `<li class="${i <= st.passed ? 'on' : ''}"><span>${esc(p[0])}</span><span class="muted">${i <= st.passed ? (i ? fmtDate(st.reached[i]) : 'Start') : kmU(p[3], 0)}</span></li>`).join('')}
+    </ol></div></details>
+    <div class="row">${st.done ? '<button class="sm primary" data-jr="pick">Start another journey</button>' : '<button class="sm" data-jr="pick">Change journey</button>'}<button class="sm danger" data-jr="stop">${st.done ? 'Clear' : 'Stop journey'}</button></div>
+    <p class="fhint">Distances are approximate. Map outline from Natural Earth.</p>`;
+}
+function openJourneys(){
+  const d = $('#jrDlg'), cur = jState();
+  d.innerHTML = `<h3>Choose a journey</h3>
+    <p class="muted">Distance you run from today counts towards it.${cur && !cur.done ? ' Switching restarts from the beginning.' : ''}</p>
+    ${JOURNEYS.map((j, i) => `${i === 0 || (JOURNEYS[i - 1].kind === 'mountain') !== (j.kind === 'mountain') ? `<h4 class="jgrp">${j.kind === 'mountain' ? '⛰ Mountain walks, with hills for your treadmill' : '🗺️ Long-distance routes'}</h4>` : ''}<div class="pcard"><strong>${esc(j.name)}</strong><span class="muted">, ${kmU(jLen(j), jLen(j) < 20 ? 1 : 0)}${j.pts[0][0] === j.pts[j.pts.length - 1][0] ? (j.kind === 'mountain' ? ' round trip' : ' loop') : ''}${j.prof ? `, ${Math.round(jAscent(j)).toLocaleString('en-GB')} m of climbing` : `, ${j.pts.length - 2} stops on the way`}</span><p>${esc(j.blurb)}</p>
+      <button class="sm${cur && cur.j.id === j.id && !cur.done ? '' : ' primary'}" data-jstart="${j.id}"${cur && cur.j.id === j.id && !cur.done ? ' disabled' : ''}>${cur && cur.j.id === j.id && !cur.done ? 'Your current journey' : 'Start this journey'}</button></div>`).join('')}
+    <div class="drow"><span></span><button id="jrClose">Close</button></div>`;
+  d.querySelector('#jrClose').onclick = () => d.close();
+  d.querySelectorAll('[data-jstart]').forEach(b => b.onclick = () => {
+    if (cur && !cur.done && cur.km > 0 && !confirm(`Leave ${cur.j.name}? Your ${kmU(cur.km)} on it won’t carry over.`)) return;
+    settings.journey = { id: b.dataset.jstart, start: Date.now(), seen: 0 }; saveSettings();
+    d.close(); renderJourney(); toast(`${jById(b.dataset.jstart).name}: off you go!`);
+  });
+  d.showModal();
+}
+// after a run: celebrate each town passed (once), and finishing the journey
+function journeyCheck(){
+  const st = jState(); if (!st || st.passed <= (st.a.seen || 0)) return;
+  const town = st.j.pts[st.passed][0];
+  settings.journey.seen = st.passed;
+  if (st.done){
+    settings.journeysDone = (settings.journeysDone || []).concat({ id: st.j.id, start: st.a.start, end: Date.now() });
+    showBadgeText(`🏁 ${st.j.name} complete!`); toast(`🏁 You’ve finished ${st.j.name}!`);
+  } else {
+    showBadgeText(`📍 You’ve reached ${town}`); toast(`📍 ${st.j.name}: you’ve reached ${town}. ${st.next[0]} is next.`);
+  }
+  saveSettings();
+  if (settings.confetti) confetti(st.done ? 10 : 3);
+  renderJourney();
+}
+function jReportLine(from, to){
+  const st = jState(); if (!st) return '';
+  const km = store.get(KEY, []).filter(r => r.date >= Math.max(from, st.a.start) && r.date < to).reduce((s, r) => s + r.dist, 0) / 1000;
+  if (km <= 0) return '';
+  return `<p>🗺️ ${esc(st.j.name)}: ${kmU(km)} closer. ${st.done ? 'Journey complete!' : `${st.passed ? `Past ${esc(st.j.pts[st.passed][0])}, ` : ''}${kmU(st.next[3] - st.km)} to ${esc(st.next[0])}.`}</p>`;
+}
+
+/* ---------- terrain: the treadmill incline follows the journey's hills ---------- */
+const terr = { sent: null, at: 0, seg: -1, held: -1 };
+function terrainNow(){
+  const st = jState(); if (!st || !st.j.prof || st.done || !run || run.demo && !isDemo) return null;
+  const km = Math.min(st.len, st.km + run.dist / 1000), p = st.j.prof;
+  let seg = p.length - 1; for (let i = 1; i < p.length; i++) if (km + .02 <= p[i][0]){ seg = i; break; }
+  const grade = jGrade(st.j, km), max = settings.terrainMax || 8;
+  const [mn, mx] = isDemo ? [0, 12] : ctrl.inclineRange || [0, 12];
+  const target = Math.max(0, Math.min(max, mx, Math.round(grade * 2) / 2)); // nearest 0.5%, never below flat
+  return { st, km, seg, grade, target, capped: grade > Math.min(max, mx) + .25, mn };
+}
+function terrainTick(){
+  const t = terrainNow(); renderTerrain(t);
+  if (!t || !settings.terrain || wo || !controlAvailable() || !(isDemo || ctrl.incline) || live.speed <= MOVING) return;
+  if (terr.held === t.seg) return;                 // you changed the incline yourself on this stretch
+  if (t.seg !== terr.seg){ terr.seg = t.seg; terr.held = -1; }
+  if (terr.sent != null && Math.abs(t.target - terr.sent) < .5) return;
+  if (terr.sent != null && run.moving - terr.at < 8) return;   // no more than one change every 8 seconds of running
+  const prev = terr.sent; terr.sent = t.target; terr.at = run.moving;
+  setIncline(Math.max(t.mn, t.target));
+  if (settings.cues && prev != null && Math.abs(t.target - prev) >= 1.5)
+    say(t.target > prev ? `Climbing. Incline ${t.target} percent.` : t.target === 0 ? 'Levelling off.' : `Easing to ${t.target} percent.`);
+}
+function renderTerrain(t = terrainNow()){
+  const el = $('#terrainPanel'); if (!el) return;
+  const show = !!t && !!settings.terrain;
+  if (el.hidden !== !show) el.hidden = !show;
+  if (!show) return;
+  const off = !controlAvailable() ? 'Treadmill control is off, so set the incline yourself.' : wo ? 'Paused while your workout sets the incline.' : terr.held === t.seg ? 'You’ve set the incline yourself; it follows the hills again from the next stretch.' : '';
+  el.innerHTML = `<div class="step-head"><span>⛰ ${esc(t.st.j.name)}</span><span>${Math.round(jEle(t.st.j, t.km))} m</span></div>
+    <p class="terrline">${t.grade > .25 ? `Climbing at ${t.grade.toFixed(0)}%` : t.grade < -.25 ? `Downhill at ${Math.abs(t.grade).toFixed(0)}%` : 'Flat'}${off ? '' : `, treadmill ${t.target}%${t.capped ? ' (your steepest)' : ''}`}</p>
+    ${off ? `<p class="hint">${off}</p>` : ''}${jProfile(t.st.j, t.km)}`;
+}
+
 function renderPcard(){
   const me = curProfile(), runs = allRuns(), first = runs.length ? Math.min(...runs.map(r => r.date)) : null;
   const h = parseHeight(settings.height), age = ageOf(settings.dob), g = { male: 'Male', female: 'Female', other: 'Other' }[settings.gender];
@@ -4687,7 +4960,7 @@ function openPEdit(){
   d.showModal();
 }
 function renderHistory(){
-  renderPcard(); showPsub(psub); renderBadges(); renderWeight();
+  renderPcard(); showPsub(psub); renderBadges(); renderWeight(); renderJourney();
   { const st = computeStreak(allRuns()); refreshStreak(st); renderStreakBox(st); }
   $('#bkNagH').innerHTML = backupDue() ? backupNag() : '';
   const runs = allRuns();
@@ -5131,6 +5404,7 @@ function nudgeIncline(sign){
   const [mn, mx] = isDemo ? [0, 12] : ctrl.inclineRange;
   const t = Math.min(mx, Math.max(mn, base + sign));
   ctrlTarget.inc = t; ctrlTarget.inTs = performance.now();
+  { const tn = terrainNow(); if (tn && settings.terrain){ terr.held = tn.seg; terr.sent = t; } } // your choice holds for this stretch
   if (navigator.vibrate) navigator.vibrate(15);
   setIncline(t); renderLive();
 }
@@ -5264,6 +5538,22 @@ $('#setWtTrack').onchange = e => { settings.wtTrack = e.target.checked; saveSett
 $('#themeSeg').addEventListener('click', e => { const b = e.target.closest('button[data-th]'); if (b){ settings.theme = b.dataset.th; saveSettings(); applyTheme(); renderSettings(); } });
 $('#lastWeekBtn').onclick = () => { const ws = weekStart(Date.now()); ws.setDate(ws.getDate() - 7); openSummary(ws); };
 $('#lastMonthBtn').onclick = () => openMonthly(1);
+$('#jrBox').addEventListener('change', e => {
+  if (e.target.id === 'jTerrain'){
+    settings.terrain = e.target.checked; saveSettings();
+    if (settings.terrain && !settings.control) toast('Turn on Treadmill control in Settings so the app can move the incline');
+    terr.sent = null; renderTerrain();
+  } else if (e.target.id === 'jTerrainMax'){ settings.terrainMax = +e.target.value; saveSettings(); terr.sent = null; renderTerrain(); }
+});
+$('#jrBox').addEventListener('click', e => {
+  const b = e.target.closest('[data-jr]'); if (!b) return;
+  if (b.dataset.jr === 'pick') openJourneys();
+  else if (b.dataset.jr === 'stop'){
+    const st = jState();
+    if (st && !st.done && !confirm(`Stop ${st.j.name}? Your progress on it will be lost.`)) return;
+    delete settings.journey; saveSettings(); renderJourney();
+  }
+});
 $('#wtBox').addEventListener('click', e => {
   const v = e.target.closest('[data-wtv]');
   if (v){ settings.wtView = v.dataset.wtv; saveSettings(); renderWeight(); return; }
@@ -5302,6 +5592,7 @@ function openMonthly(off = 1){
     ${newB.length ? `<h4>Badges earned</h4><div class="mbadges">${newB.map(b => `<span class="mbadge"><span class="bdisc ${b.tier}"><span>${b.icon}</span></span>${esc(b.name)}</span>`).join('')}</div>` : ''}
     ${pbs.length ? `<h4>New personal bests</h4><ul class="sumlist">${pbs.map(x => `<li>${esc(x)}</li>`).join('')}</ul>` : ''}`
     : '<p class="muted">No runs logged that month.</p>'}
+    ${jReportLine(ms, me)}
     ${wtReportLine(ms, me, 'this month')}
     <div class="drow"><span><button class="sm" id="monPrev">‹ Earlier</button>${off > 1 ? ' <button class="sm" id="monNext">Later ›</button>' : ''}</span><button class="sm primary" id="sumClose">Close</button></div>`;
   d.querySelector('#monPrev').onclick = () => openMonthly(off + 1);
@@ -5564,7 +5855,8 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape' && $('#badgeD
     if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom) d.close(); }); });
 setTimeout(() => { // once a day, if the streak is waiting on today's run
   const today = dayKey(Date.now());
-  if (STK.current && !STK.todayActive && !STK.todayHoliday && store.get(RISKTOLD, 0) !== today){ store.set(RISKTOLD, today); toast(STK.freezesLeft ? `🔥 Your ${STK.current}-day streak is waiting. Run 10 minutes today to keep it going.` : `🔥 Your ${STK.current}-day streak is at risk: no freezes left this week, so run 10 minutes today to keep it.`); }
+  // only warn once both of this week's freezes are used, as until then a missed day is covered
+  if (STK.current && !STK.todayActive && !STK.todayHoliday && !STK.freezesLeft && store.get(RISKTOLD, 0) !== today){ store.set(RISKTOLD, today); toast(`🔥 Your ${STK.current}-day streak is at risk: both freezes are used this week, so run 10 minutes today to keep it.`); }
 }, 4200);
 initCelebs();
 setTimeout(() => whenPickerClosed(() => { if ($('#sumDlg').open) $('#sumDlg').addEventListener('close', () => setTimeout(checkNewBadges, 400), { once: true }); else checkNewBadges(); }), 1500);
@@ -5576,7 +5868,7 @@ document.addEventListener('click', e => {
 });
 // hand a few things to health.js and notify.js (Android app only)
 window.mmApp = { settings, saveSettings, store, toast, runs: () => store.get(KEY, []), profileName: () => curProfile().name,
-  liveRun: () => run, live: () => live, computeStreak, allRuns, profileRuns, weekStart, dayKey, profiles,
+  liveRun: () => run, live: () => live, computeStreak, allRuns, profileRuns, weekStart, dayKey, profiles, freezesPerWeek: FREEZES_PER_WEEK,
   addWeighIns, wtFmt: kg => wtFmt(kg), fmtDate: t => fmtDate(t) };
 window.dispatchEvent(new Event('mmapp-ready'));
 })();
