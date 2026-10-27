@@ -414,6 +414,22 @@ nav.tabs button{padding:0 .15rem;font-size:.86rem}
 .podnote:empty{display:none}
 @keyframes podrise{from{transform:scaleY(.12)}to{transform:scaleY(1)}}
 @media (prefers-reduced-motion:reduce){.pod-block{animation:none}}
+/* glance view: journey map */
+.gl-map{align-self:stretch;margin-top:1vh;cursor:default;-webkit-tap-highlight-color:transparent}
+.gl-map.tappable{cursor:pointer}
+.glm-svg svg{display:block;width:100%;height:auto;max-height:24vh;border-radius:14px;border:2px solid rgba(251,246,238,.35)}
+.glance.map-only .glm-svg svg{max-height:38vh}
+.glm-prof svg{display:block;width:100%;height:auto;max-height:9vh;margin-top:.4vh}
+.glm-prof .jparea{fill:var(--track-ink);opacity:.18}.glm-prof .jpline{stroke:var(--track-ink);opacity:.7}
+.glm-prof .jpdone{fill:var(--track-ink);opacity:.45}.glm-prof .jpnow{stroke:var(--track-ink)}
+.glm-prof .jpdot{fill:var(--track-ink);stroke:#161B18}.glm-prof .ax{fill:var(--track-ink)}
+.glme{transition:transform 1.05s linear}
+.glme circle:not(.glpulse){fill:#161B18;stroke:#FBF6EE}
+.glme text{fill:#FBF6EE}
+.glme .glpulse{fill:#FBF6EE;opacity:.35;animation:glpulse 1.8s ease-out infinite;transform-box:fill-box;transform-origin:center}
+@keyframes glpulse{0%{transform:scale(.7);opacity:.55}100%{transform:scale(1.6);opacity:0}}
+@media (prefers-reduced-motion:reduce){.glme{transition:none}.glme .glpulse{animation:none}}
+@media (orientation:landscape){.glm-svg svg{max-height:34vh}.glance.map-only .glm-svg svg{max-height:52vh}}
 /* glance view: live workout timeline */
 .gl-tl{align-self:stretch;margin-top:1.2vh;cursor:default;-webkit-tap-highlight-color:transparent}
 .gl-tl svg{display:block;width:100%;height:auto;max-height:30vh}
@@ -558,13 +574,24 @@ nav.tabs button{padding:0 .15rem;font-size:.86rem}
 .jhead{display:flex;justify-content:space-between;align-items:baseline;gap:.5rem;flex-wrap:wrap}
 .jprog{height:10px;border-radius:5px;margin:.4rem 0}
 .jwrap{margin:.5rem 0;border-radius:14px;overflow:hidden;border:1px solid var(--rule)}
-.jmap{display:block;width:100%;height:auto;max-height:62vh}
+.jmap{display:block;width:100%;height:auto;max-height:62vh;background:var(--sea)}
 .jsea{fill:var(--sea)}
 .jland{fill:var(--land);stroke:var(--coast);stroke-linejoin:round}
 .jroute{fill:none;stroke:var(--muted);stroke-linecap:round;stroke-linejoin:round;opacity:.7}
 .jdone{fill:none;stroke:var(--track);stroke-linecap:round;stroke-linejoin:round}
 .jpt{fill:var(--paper);stroke:var(--muted);stroke-width:1.2px;vector-effect:non-scaling-stroke}
 .jpt.on{fill:var(--track);stroke:none}
+.jmap.tiled{background:#e8e4dc}
+.jtiles image{image-rendering:auto}
+:root[data-theme="dark"] .jtiles{filter:brightness(.82) contrast(1.05)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .jtiles{filter:brightness(.82) contrast(1.05)}}
+.tiled .jroute{stroke:#2b2b2b;opacity:.75}
+.tiled .jpt{fill:#fff;stroke:#2b2b2b}
+.tiled .jlab{fill:#1b1b1b;stroke:#fff}
+.tiled .jme circle{stroke:#fff}
+.jstyle{margin:.5rem 0 .3rem}.jstyle button{min-height:34px;padding:0 .9rem;font-size:.88rem}
+.jcredit a{color:inherit}
+.glm-credit{font-size:.62rem;opacity:.75;text-align:right;margin-top:.15rem;line-height:1.2}.glm-credit a{color:inherit}
 .jlake{fill:var(--sea);stroke:var(--coast);stroke-width:1px;vector-effect:non-scaling-stroke}
 .jriver{fill:none;stroke:var(--coast);stroke-width:1.6px;stroke-linecap:round;stroke-linejoin:round;opacity:.9}
 .jlab{fill:var(--ink);font-family:var(--body);font-weight:600;paint-order:stroke;stroke:var(--land);stroke-width:.25em;stroke-linejoin:round}
@@ -790,6 +817,8 @@ body.picking{overflow:hidden}
   <div id="woTop"></div>
   <div id="planBox"></div>
   <div id="wlist"></div>
+  <details class="sect" data-sect="journey" id="jrSect" open><summary>Virtual journey<span class="count" id="jrCount"></span></summary>
+  <div class="sbody" id="jrBox"></div></details>
 </section>
 
 <!-- ================= HISTORY ================= -->
@@ -809,8 +838,6 @@ body.picking{overflow:hidden}
   <h3>Personal bests</h3>
   <p class="fhint">Fastest efforts found anywhere inside your runs.</p>
   <div class="stats two" id="pbs"></div>
-  <div id="jrSect"><h3>Virtual journey</h3>
-  <div id="jrBox"></div></div>
   <div id="wtSect"><h3>Weight</h3>
   <div class="wtbox" id="wtBox"></div></div>
   </div>
@@ -994,6 +1021,7 @@ body.picking{overflow:hidden}
       <div class="gl-block"><span class="gl-n" id="glDist">0.00</span><span class="gl-l" id="glDistU">km</span></div>
       <div class="gl-step" id="glStep"></div></div>
       <div class="gl-tl" id="glTl" hidden><div id="glTlSvg"></div><div class="gl-tlinfo" id="glTlInfo"></div></div>
+      <div class="gl-map" id="glMap" hidden><div class="glm-svg" id="glMapSvg"></div><div class="glm-prof" id="glMapProf"></div><div class="gl-tlinfo glm-info" id="glMapInfo"></div><div class="glm-credit" id="glMapCredit"></div></div>
     </div></div>
     <div class="gl-side">
       <div class="gl-stats">
@@ -2159,7 +2187,7 @@ function finishRun(){
     else toast('Couldn’t save: browser storage is full or blocked. Back up and delete old runs.');
   }
   store.del(DRAFT);
-  run = null; wo = null; releaseWake(); renderLive(); renderHistory();
+  run = null; wo = null; releaseWake(); renderLive(); renderHistory(); renderJourney();
   if (!savedId) liveBadges.clear();
   frExpanded = false; frKey = '';
   if (wasMoving){ needStop = true; if (controlAvailable()) gradualStop(10); }
@@ -2753,6 +2781,7 @@ function syncSelCard(){
   $('#selCard').hidden = !!(ap && sectOpen('plan', true) && String(selected).startsWith('plan:') && nextPlanIndex(ap) === +String(selected).slice(5));
 }
 function renderWorkouts(){
+  renderJourney();
   const custom = customWorkouts(), sw = getWorkout(selected);
   const ap = activePlan();
   syncSelCard();
@@ -3300,7 +3329,12 @@ function renderGlance(){
   }
   $('#glStep').textContent = step;
   $('#glance').classList.add('has-tl');
-  $('#glTl').hidden = false;
+  // with a journey on, the map takes the timeline's place on free runs with no target; workouts keep both
+  const jOn = !!jState(), keepTl = !jOn || wo || getWorkout(selected) || currentFT().k !== 'none';
+  $('#glTl').hidden = !keepTl;
+  $('#glance').classList.toggle('has-map', jOn);
+  $('#glance').classList.toggle('map-only', jOn && !keepTl);
+  renderGlMap();
   // free runs: always there; workouts: once the workout is done. It pulses when a target or workout is complete
   $('#glFinish').hidden = !(run && (!wo || wo.done));
   $('#glFinish').classList.toggle('pulse', !!(run && ((wo && wo.done) || (!wo && run.freeDone))));
@@ -3308,6 +3342,73 @@ function renderGlance(){
   const mw = $('#glMain').clientWidth * .98;
   fitGlance();
   fitText($('#glDist'), mw);
+}
+/* ---------- glance view: journey map with a live marker ----------
+ * The map is built once per view and only the marker and the walked line move: the marker glides
+ * between treadmill updates with a CSS transition, so it travels smoothly along the route. Long routes
+ * show a close-up that follows you (tap for the whole route); short ones always show the whole route. */
+let glMapKey = '', glMapS = 1, glMapP = null;  // set when the map is built (jXY is defined further down)
+function glMapBuild(st, km, zoom){
+  const j = st.j, len = st.len;
+  let a = 0, b = len, idx = 0;
+  if (zoom){ const span = Math.min(40, Math.max(8, len * .06)), stepK = span * .4; idx = Math.floor(km / stepK); a = Math.max(0, idx * stepK - span * .25); b = Math.min(len, a + span); }
+  const style = mapStyle(j);
+  // with map tiles the zoom comes from the stretch in view, so close-ups show streets and paths
+  let P = jXY;
+  if (style){ const ll = []; for (let i = 0; i <= 30; i++){ const q = jPos(j, a + (b - a) * i / 30, (la, lo) => [la, lo]); ll.push(q); } P = tileProj(ll, 560, TILES[style].max); }
+  const frame = []; for (let i = 0; i <= 30; i++) frame.push(jPos(j, a + (b - a) * i / 30, P));
+  let x0 = Math.min(...frame.map(p => p[0])), x1 = Math.max(...frame.map(p => p[0])), y0 = Math.min(...frame.map(p => p[1])), y1 = Math.max(...frame.map(p => p[1]));
+  const pad = Math.max(x1 - x0, y1 - y0) * .18 + (style ? 4 : .4); x0 -= pad; x1 += pad; y0 -= pad; y1 += pad;
+  const w = x1 - x0, h = y1 - y0;
+  if (w < h * 1.25){ const d = h * 1.25 - w; x0 -= d / 2; x1 += d / 2; }      // a little wider than tall
+  if (h < w * .62){ const d = w * .62 - h; y0 -= d / 2; y1 += d / 2; }
+  const W = x1 - x0, H = y1 - y0, s = W / 320, xy = j.pts.map(p => P(p[1], p[2]));
+  const line = pts => pts.map(p => p[0].toFixed(2) + ',' + p[1].toFixed(2)).join(' ');
+  const loop = j.pts[0][0] === j.pts[j.pts.length - 1][0];
+  let svg = `<svg viewBox="${x0.toFixed(2)} ${y0.toFixed(2)} ${W.toFixed(2)} ${H.toFixed(2)}" class="jmap glm${style ? ' tiled' : ''}" role="img" aria-label="${esc(j.name)} map with your position">
+    ${style ? tileImgs(style, P.z, x0, y0, x1, y1) : `<path d="${COAST.d}" class="jland" stroke-width="${(s * .8).toFixed(3)}"/><path d="${WATER.l}" class="jlake"/><path d="${WATER.r}" class="jriver" vector-effect="non-scaling-stroke"/>`}
+    <polyline points="${line(xy)}" class="jroute" stroke-width="${(s * 2.6).toFixed(3)}" stroke-dasharray="${(s * 5).toFixed(2)} ${(s * 3.5).toFixed(2)}"/>
+    <polyline points="" id="glDone" class="jdone" stroke-width="${(s * 4).toFixed(3)}"/>`;
+  // every stop in view gets a dot and a name, so a close-up reads like a real map
+  const inView = p => p[0] > x0 && p[0] < x1 && p[1] > y0 && p[1] < y1;
+  const nextI = j.pts.findIndex(p => p[3] > km);
+  let topI = -1; if (j.prof) j.pts.forEach((p, i) => { if (topI < 0 || jEle(j, p[3]) > jEle(j, j.pts[topI][3])) topI = i; });
+  xy.forEach((p, i) => {
+    if ((loop && i === xy.length - 1) || !inView(p)) return;
+    const on = km >= j.pts[i][3], big = i === 0 || i === xy.length - 1;
+    svg += `<circle cx="${p[0].toFixed(2)}" cy="${p[1].toFixed(2)}" r="${(s * (big ? 4.2 : 3)).toFixed(3)}" class="${on ? 'jpt on' : 'jpt'}"/>`;
+    // close-ups name every stop; the whole-route view only the start, finish, next stop and summit, so names don't pile up
+    if (!zoom && !(i === 0 || i === xy.length - 1 || i === nextI || i === topI)) return;
+    const tw = j.pts[i][0].length * s * 7, end = p[0] + s * 8 + tw > x1;
+    svg += `<text x="${(p[0] + (end ? -1 : 1) * s * 8).toFixed(2)}" y="${(p[1] + (i === nextI ? s * 26 : -s * 7)).toFixed(2)}" font-size="${(s * 12.5).toFixed(2)}" text-anchor="${end ? 'end' : 'start'}" class="jlab">${esc(j.pts[i][0])}</text>`;
+  });
+  const me = jPos(j, km, P);
+  svg += `<g id="glMe" class="jme glme" style="transform:translate(${me[0].toFixed(3)}px,${me[1].toFixed(3)}px)">
+    <circle r="${(s * 15).toFixed(3)}" class="glpulse"/><circle r="${(s * 11).toFixed(3)}" stroke-width="${(s * 2.2).toFixed(3)}"/>
+    <text y="${(s * 4.8).toFixed(3)}" font-size="${(s * 13).toFixed(2)}">${esc(initial(curProfile().name))}</text></g></svg>`;
+  return { svg, key: `${j.id}|${zoom ? 'z' + idx : 'all'}|${st.passed}|${profiles.current}|${style}`, s, P, style };
+}
+function renderGlMap(){
+  const box = $('#glMap'), st = jState();
+  if (!st){ if (!box.hidden) box.hidden = true; glMapKey = ''; return; }
+  box.hidden = false;
+  const km = Math.min(st.len, st.km + (run ? run.dist / 1000 : 0)), j = st.j;
+  const long = st.len > 50, zoom = long && settings.glMapZoom !== false;
+  const passedLive = j.pts.filter(p => km >= p[3]).length - 1;
+  const b = glMapBuild(Object.assign({}, st, { passed: passedLive }), km, zoom);
+  if (b.key !== glMapKey){ $('#glMapSvg').innerHTML = b.svg; glMapKey = b.key; glMapS = b.s; glMapP = b.P; $('#glMapCredit').innerHTML = b.style ? TILES[b.style].credit : ''; }
+  const me = jPos(j, km, glMapP), g = $('#glMe');
+  if (g) g.style.transform = `translate(${me[0].toFixed(3)}px,${me[1].toFixed(3)}px)`;
+  const done = j.pts.filter(p => p[3] <= km).map(p => glMapP(p[1], p[2])).concat([me]);
+  const dl = $('#glDone'); if (dl) dl.setAttribute('points', done.map(p => p[0].toFixed(2) + ',' + p[1].toFixed(2)).join(' '));
+  // mountain walks: the height profile with your live position
+  $('#glMapProf').innerHTML = j.prof ? jProfile(j, km) : '';
+  const next = j.pts[passedLive + 1], last = j.pts[passedLive];
+  const hill = j.prof ? ` · ${Math.round(jEle(j, km))} m${jGrade(j, km) > .25 ? `, climbing ${jGrade(j, km).toFixed(0)}%` : ''}` : '';
+  const info = km >= st.len ? `🏁 ${j.name} complete!` : `📍 ${passedLive ? `Past ${last[0]}` : `From ${last[0]}`} · ${next[0]} in ${kmU(next[3] - km)}${hill}`;
+  if ($('#glMapInfo').textContent !== info) $('#glMapInfo').textContent = info;
+  box.title = long ? (zoom ? 'Tap to see the whole route' : 'Tap to follow your marker close up') : '';
+  box.classList.toggle('tappable', long);
 }
 // shrink a big number if it would overflow its area (e.g. 10.00+ km)
 function fitText(el, maxW){
@@ -4783,16 +4884,58 @@ function jState(pid = profiles.current){
   return { j, a, km: Math.min(km, len), len, passed, next: j.pts[passed + 1] || null, done: km >= len, reached, ps };
 }
 // where on the map a distance along the route is
-function jPos(j, km){
-  const p = j.pts; if (km <= 0) return jXY(p[0][1], p[0][2]);
+/* Real map tiles under the journey: OpenStreetMap for routes, OpenTopoMap (contours and hill shading) for
+ * mountain walks. They need a connection, so the drawn map is the fallback when offline or if tiles won't
+ * load. Both are free with the credit shown under the map; settings.mapStyle = auto | street | topo | drawn. */
+const TILES = {
+  street: { url: (z, x, y) => `https://tile.openstreetmap.org/${z}/${x}/${y}.png`, max: 19,
+    credit: 'Map © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors' },
+  topo: { url: (z, x, y) => `https://${'abc'[(x + y) % 3]}.tile.opentopomap.org/${z}/${x}/${y}.png`, max: 17,
+    credit: 'Map data © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors, SRTM. Style © <a href="https://opentopomap.org" target="_blank" rel="noopener">OpenTopoMap</a> (CC-BY-SA)' }
+};
+let tilesBroken = false;
+function mapStyle(j){
+  const m = settings.mapStyle || 'auto';
+  if (m === 'drawn' || tilesBroken || !navigator.onLine) return null;
+  return m === 'street' || m === 'topo' ? m : j.prof ? 'topo' : 'street';
+}
+// Web Mercator, 0..1 across the world
+const merc = (lat, lon) => { const s = Math.sin(lat * Math.PI / 180); return [(lon + 180) / 360, .5 - Math.log((1 + s) / (1 - s)) / (4 * Math.PI)]; };
+// a projection in tile pixels at the zoom where these points fill about px pixels across
+function tileProj(points, px, max){
+  const m = points.map(p => merc(p[0], p[1]));
+  const span = Math.max(Math.max(...m.map(p => p[0])) - Math.min(...m.map(p => p[0])), (Math.max(...m.map(p => p[1])) - Math.min(...m.map(p => p[1]))) * 1.25, 1e-6);
+  const z = Math.max(2, Math.min(max, Math.floor(Math.log2(px / (span * 1.45 * 256)))));
+  const P = (lat, lon) => { const q = merc(lat, lon), n = 256 * 2 ** z; return [q[0] * n, q[1] * n]; };
+  P.z = z; return P;
+}
+function tileImgs(style, z, x0, y0, x1, y1){
+  const n = 2 ** z, t = TILES[style]; let out = '<g class="jtiles">';
+  for (let ty = Math.max(0, Math.floor(y0 / 256)); ty <= Math.min(n - 1, Math.floor(y1 / 256)); ty++)
+    for (let tx = Math.floor(x0 / 256); tx <= Math.floor(x1 / 256); tx++)
+      out += `<image href="${t.url(z, ((tx % n) + n) % n, ty)}" x="${tx * 256}" y="${ty * 256}" width="256.5" height="256.5" preserveAspectRatio="none" onerror="tileFail()" onload="tileOk()"/>`;
+  return out + '</g>';
+}
+// if tiles won't load (no signal, or the server says no), fall back to the drawn map rather than a blank one
+let tileFails = 0, tileLoads = 0;
+window.tileOk = () => { tileLoads++; };
+window.tileFail = () => {
+  if (++tileFails < 3 || tileLoads > tileFails || tilesBroken) return;
+  tilesBroken = true; toast('Couldn’t load the map, showing the simple one');
+  renderJourney(); glMapKey = ''; if (glanceOpen()) renderGlMap();
+};
+window.addEventListener('online', () => { tilesBroken = false; tileFails = tileLoads = 0; renderJourney(); glMapKey = ''; });
+function jPos(j, km, P = jXY){
+  const p = j.pts; if (km <= 0) return P(p[0][1], p[0][2]);
   for (let i = 1; i < p.length; i++) if (km <= p[i][3]){
-    const f = (km - p[i - 1][3]) / (p[i][3] - p[i - 1][3]), a = jXY(p[i - 1][1], p[i - 1][2]), b = jXY(p[i][1], p[i][2]);
+    const f = (km - p[i - 1][3]) / (p[i][3] - p[i - 1][3]), a = P(p[i - 1][1], p[i - 1][2]), b = P(p[i][1], p[i][2]);
     return [a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f];
   }
-  return jXY(p[p.length - 1][1], p[p.length - 1][2]);
+  return P(p[p.length - 1][1], p[p.length - 1][2]);
 }
 function jMap(st, others){
-  const j = st.j, xy = j.pts.map(p => jXY(p[1], p[2]));
+  const j = st.j, style = mapStyle(j), P = style ? tileProj(j.pts.map(p => [p[1], p[2]]), 560, TILES[style].max) : jXY;
+  const xy = j.pts.map(p => P(p[1], p[2]));
   let x0 = Math.min(...xy.map(p => p[0])), x1 = Math.max(...xy.map(p => p[0])), y0 = Math.min(...xy.map(p => p[1])), y1 = Math.max(...xy.map(p => p[1]));
   // pad the route and keep the view at least 4:3 wide, so short routes get some surrounding country
   // short city routes stay zoomed in
@@ -4803,11 +4946,11 @@ function jMap(st, others){
   if (h < w * .62){ const d = w * .62 - h; y0 -= d / 2; y1 += d / 2; }
   const W = x1 - x0, H = y1 - y0, s = W / 320; // s: map units per screen-ish pixel, so dots and text stay the same size on every route
   const line = pts => pts.map(p => p[0].toFixed(1) + ',' + p[1].toFixed(1)).join(' ');
-  const doneXY = xy.slice(0, st.passed + 1).concat([jPos(j, st.km)]);
+  const doneXY = xy.slice(0, st.passed + 1).concat([jPos(j, st.km, P)]);
   const loop = j.pts[0][0] === j.pts[j.pts.length - 1][0];   // a loop like the Three Peaks finishes where it starts
 
-  let svg = `<svg viewBox="${x0.toFixed(1)} ${y0.toFixed(1)} ${W.toFixed(1)} ${H.toFixed(1)}" class="jmap" role="img" aria-label="Map of ${esc(j.name)} showing your progress">
-    <rect x="${x0}" y="${y0}" width="${W}" height="${H}" class="jsea"/><path d="${COAST.d}" class="jland" stroke-width="${(s * .8).toFixed(2)}"/><path d="${WATER.l}" class="jlake"/><path d="${WATER.r}" class="jriver" vector-effect="non-scaling-stroke"/>
+  let svg = `<svg viewBox="${x0.toFixed(1)} ${y0.toFixed(1)} ${W.toFixed(1)} ${H.toFixed(1)}" class="jmap${style ? ' tiled' : ''}" role="img" aria-label="Map of ${esc(j.name)} showing your progress">
+    ${style ? tileImgs(style, P.z, x0, y0, x1, y1) : `<rect x="${x0}" y="${y0}" width="${W}" height="${H}" class="jsea"/><path d="${COAST.d}" class="jland" stroke-width="${(s * .8).toFixed(2)}"/><path d="${WATER.l}" class="jlake"/><path d="${WATER.r}" class="jriver" vector-effect="non-scaling-stroke"/>`}
     <polyline points="${line(xy)}" class="jroute" stroke-width="${(s * 2.2).toFixed(2)}" stroke-dasharray="${(s * 4).toFixed(1)} ${(s * 3).toFixed(1)}"/>
     <polyline points="${line(doneXY)}" class="jdone" stroke-width="${(s * 3.4).toFixed(2)}"/>`;
   xy.forEach((p, i) => { if (loop && i === xy.length - 1) return; svg += `<circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="${(s * (i === 0 || i === xy.length - 1 ? 3.6 : 2.4)).toFixed(2)}" class="${i <= st.passed ? 'jpt on' : 'jpt'}"/>`; });
@@ -4819,7 +4962,7 @@ function jMap(st, others){
     return `<text x="${(p[0] + (end ? -1 : 1) * gap).toFixed(1)}" y="${(p[1] + (below ? s * 21 : -s * 8)).toFixed(1)}" font-size="${(s * 11).toFixed(1)}" text-anchor="${end ? 'end' : 'start'}" class="jlab">${esc(j.pts[i][0])}</text>`; };
   svg += label(0, false, xy[1][0]) + (loop ? '' : label(xy.length - 1, false, xy[xy.length - 2][0]));
   const nextI = st.next && st.passed + 1 < xy.length - 1 ? st.passed + 1 : -1;
-  if (nextI > 0) svg += label(nextI, true, jPos(j, st.km)[0]);
+  if (nextI > 0) svg += label(nextI, true, jPos(j, st.km, P)[0]);
   // mountain walks: always name the summit (the highest stop)
   if (j.prof){ let top = 0; j.pts.forEach((p, i) => { if (jEle(j, p[3]) > jEle(j, j.pts[top][3])) top = i; });
     if (top > 0 && top < xy.length - 1 && top !== nextI){
@@ -4827,8 +4970,8 @@ function jMap(st, others){
       svg += `<text x="${cx.toFixed(1)}" y="${(p[1] - s * 14).toFixed(1)}" font-size="${(s * 11).toFixed(1)}" text-anchor="middle" class="jlab">▲ ${esc(j.pts[top][0])}</text>`;
     } }  // next stop, below the line so it clears your marker
   // everyone else in the household on the same journey, then you on top
-  others.forEach(o => { const p = jPos(j, o.km); svg += `<g class="jme other"><circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="${(s * 8).toFixed(2)}" stroke-width="${(s * 1.6).toFixed(2)}"/><text x="${p[0].toFixed(1)}" y="${(p[1] + s * 3.8).toFixed(1)}" font-size="${(s * 10).toFixed(1)}">${esc(initial(o.p.name))}</text></g>`; });
-  const me = jPos(j, st.km);
+  others.forEach(o => { const p = jPos(j, o.km, P); svg += `<g class="jme other"><circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="${(s * 8).toFixed(2)}" stroke-width="${(s * 1.6).toFixed(2)}"/><text x="${p[0].toFixed(1)}" y="${(p[1] + s * 3.8).toFixed(1)}" font-size="${(s * 10).toFixed(1)}">${esc(initial(o.p.name))}</text></g>`; });
+  const me = jPos(j, st.km, P);
   svg += `<g class="jme"><circle cx="${me[0].toFixed(1)}" cy="${me[1].toFixed(1)}" r="${(s * 9).toFixed(2)}" stroke-width="${(s * 1.8).toFixed(2)}"/><text x="${me[0].toFixed(1)}" y="${(me[1] + s * 4).toFixed(1)}" font-size="${(s * 11).toFixed(1)}">${esc(initial(curProfile().name))}</text></g>`;
   return svg + '</svg>';
 }
@@ -4837,6 +4980,7 @@ const kmU = (km, dp = 1) => `${fD(km * 1000, dp)} ${dU()}`;
 function renderJourney(){
   const box = $('#jrBox'); if (!box) return;
   const st = jState();
+  $('#jrCount').textContent = st ? (st.done ? `${st.j.name}, done` : `${st.j.name}, ${Math.floor(st.km / st.len * 100)}%`) : 'Not started';
   if (!st){
     const doneN = (settings.journeysDone || []).length;
     box.innerHTML = `<p class="muted">Run along a real route. Every run moves you further, with a celebration at each town you pass.${doneN ? ` You’ve finished ${doneN} journey${doneN === 1 ? '' : 's'} so far.` : ''}</p>
@@ -4850,6 +4994,7 @@ function renderJourney(){
     <div class="prog jprog" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(pct)}" aria-label="Journey progress"><i style="width:${pct.toFixed(1)}%"></i></div>
     <p>${st.done ? `🏁 <strong>Journey complete!</strong> Finished in ${days} day${days === 1 ? '' : 's'}.`
       : `${st.passed ? `📍 Past <strong>${esc(last[0])}</strong>. ` : `📍 Setting off from <strong>${esc(last[0])}</strong>. `}Next: ${esc(st.next[0])} in ${kmU(st.next[3] - st.km)}.`}</p>
+    <div class="seg jstyle" role="group" aria-label="Map style">${[['auto', 'Map'], ['drawn', 'Simple']].map(([v, l]) => `<button data-mapstyle="${v}" aria-pressed="${(settings.mapStyle === 'drawn') === (v === 'drawn')}">${l}</button>`).join('')}</div>
     <div class="jwrap">${jMap(st, others)}</div>
     ${st.j.prof ? `<div class="jterr">${jProfile(st.j, st.km)}
       ${(() => { const top = jNextTop(st.j, st.km); return !st.done && top ? `<p class="muted">⛰ ${Math.max(0, Math.round(top.ele - jEle(st.j, st.km)))} m of climbing to the next top, ${kmU(top.km - st.km)} away.</p>` : ''; })()}
@@ -4862,7 +5007,7 @@ function renderJourney(){
       ${st.j.pts.map((p, i) => `<li class="${i <= st.passed ? 'on' : ''}"><span>${esc(p[0])}</span><span class="muted">${i <= st.passed ? (i ? fmtDate(st.reached[i]) : 'Start') : kmU(p[3], 0)}</span></li>`).join('')}
     </ol></div></details>
     <div class="row">${st.done ? '<button class="sm primary" data-jr="pick">Start another journey</button>' : '<button class="sm" data-jr="pick">Change journey</button>'}<button class="sm danger" data-jr="stop">${st.done ? 'Clear' : 'Stop journey'}</button></div>
-    <p class="fhint">Distances are approximate. Map outline from Natural Earth.</p>`;
+    <p class="fhint jcredit">Distances are approximate. ${mapStyle(st.j) ? TILES[mapStyle(st.j)].credit + '.' : `Map outline from Natural Earth.${settings.mapStyle !== 'drawn' ? ' The full map shows when you’re online.' : ''}`}</p>`;
 }
 function openJourneys(){
   const d = $('#jrDlg'), cur = jState();
@@ -4960,7 +5105,7 @@ function openPEdit(){
   d.showModal();
 }
 function renderHistory(){
-  renderPcard(); showPsub(psub); renderBadges(); renderWeight(); renderJourney();
+  renderPcard(); showPsub(psub); renderBadges(); renderWeight();
   { const st = computeStreak(allRuns()); refreshStreak(st); renderStreakBox(st); }
   $('#bkNagH').innerHTML = backupDue() ? backupNag() : '';
   const runs = allRuns();
@@ -5546,6 +5691,8 @@ $('#jrBox').addEventListener('change', e => {
   } else if (e.target.id === 'jTerrainMax'){ settings.terrainMax = +e.target.value; saveSettings(); terr.sent = null; renderTerrain(); }
 });
 $('#jrBox').addEventListener('click', e => {
+  const ms = e.target.closest('[data-mapstyle]');
+  if (ms){ settings.mapStyle = ms.dataset.mapstyle; saveSettings(); tilesBroken = false; tileFails = tileLoads = 0; glMapKey = ''; renderJourney(); return; }
   const b = e.target.closest('[data-jr]'); if (!b) return;
   if (b.dataset.jr === 'pick') openJourneys();
   else if (b.dataset.jr === 'stop'){
@@ -5700,6 +5847,12 @@ window.addEventListener('popstate', () => closeGlance(true));
 $('#live').addEventListener('click', openGlance);
 $('#live').addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' '){ e.preventDefault(); openGlance(); } });
 $('#glMain').addEventListener('click', () => closeGlance(false));
+$('#glMap').addEventListener('click', e => {
+  e.stopPropagation();                       // tapping the map doesn't close the big screen
+  const st = jState(); if (!st || st.len <= 50) return;
+  settings.glMapZoom = settings.glMapZoom === false; saveSettings();
+  glMapKey = ''; renderGlMap(); toast(settings.glMapZoom === false ? 'Showing the whole route' : 'Following you close up');
+});
 $('#glFinish').addEventListener('click', () => { closeGlance(false); finishRun(); });
 $('#streakBox').addEventListener('click', e => {
   const run_ = e.target.closest('[data-id]'); if (run_){ openDetail(run_.dataset.id); return; }
