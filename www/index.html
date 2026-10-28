@@ -565,6 +565,8 @@ nav.tabs button{padding:0 .15rem;font-size:.86rem}
 .wtbox p{margin:.25rem 0}
 .wtdue{font-weight:600;color:var(--track)}
 .jterr{margin:.4rem 0 .6rem}
+.jwarn p{margin:.1rem 0 .4rem}.jwarn strong{font-size:inherit;display:inline;margin:0;font-family:inherit}.jwarn .row{margin:.2rem 0 0}
+.jwarn{margin:.4rem 0;padding:.5rem .7rem;border-radius:10px;background:color-mix(in srgb,#e0a100 16%,transparent);border:1px solid color-mix(in srgb,#e0a100 55%,transparent);font-size:.9rem}
 .jprof{display:block;width:100%;height:auto;margin:.2rem 0 .4rem}
 .jparea{fill:var(--rule);opacity:.55}
 .jpline{fill:none;stroke:var(--muted);stroke-width:1.4;stroke-linejoin:round}
@@ -585,6 +587,20 @@ nav.tabs button{padding:0 .15rem;font-size:.86rem}
 .chrow .prog{height:9px;border-radius:5px}.chrow.me .chn{font-weight:700}
 .chn{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.chk{font-variant-numeric:tabular-nums;font-size:.9rem}
 .chwho{display:grid;gap:.2rem;margin-bottom:.4rem}
+.pgrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.5rem;margin:.5rem 0 1.4rem}
+.pcell{background:none;border:none;display:flex;flex-direction:column;align-items:center;gap:.2rem;padding:.3rem .1rem;min-height:auto;font-weight:400;color:var(--ink);text-align:center}
+.pcell .pname{font-size:.8rem;font-weight:600;line-height:1.2}
+.patch{display:block;max-width:100%;height:auto;overflow:visible}
+.patch .pshadow{filter:drop-shadow(0 1.6px 1.4px rgba(0,0,0,.35))}
+.patch .ptext{font-family:var(--display,var(--body));font-weight:800;letter-spacing:.06em}
+.patch .psub{letter-spacing:.12em;font-weight:700}
+.patch.unsewn{filter:grayscale(1) contrast(.75);opacity:.32}
+.pcell.locked .pname{color:var(--muted)}
+.pring{margin:-.2rem 0 .3rem;font-weight:600}
+.patchdlg .pbig{display:flex;justify-content:center;margin:.2rem 0 .6rem}
+.patchdlg .pbig .patch{width:220px;height:220px}
+.jpaused{margin:.3rem 0;font-size:.9rem;color:var(--muted)}
+.jpcard .row{justify-content:space-between;align-items:center}
 .jhead{display:flex;justify-content:space-between;align-items:baseline;gap:.5rem;flex-wrap:wrap}
 .jprog{height:10px;border-radius:5px;margin:.4rem 0}
 .jwrap{margin:.5rem 0;border-radius:14px;overflow:hidden;border:1px solid var(--rule)}
@@ -708,7 +724,7 @@ body.picking{overflow:hidden}
 .pc-nums{display:grid;grid-template-columns:repeat(3,1fr);gap:.4rem;margin-top:.8rem;padding-top:.7rem;border-top:1px solid var(--rule)}
 .pc-nums b{display:block;font-family:var(--num);font-size:1.15rem}
 .pc-nums .muted{font-size:.78rem}
-.psub{display:grid;grid-template-columns:repeat(3,1fr);background:var(--rule);border-radius:12px;padding:3px;margin:0 0 .9rem}
+.psub{display:grid;grid-template-columns:repeat(4,1fr);background:var(--rule);border-radius:12px;padding:3px;margin:0 0 .9rem}
 .psub button{border:none;background:transparent;min-height:40px;border-radius:10px;font-weight:600;color:var(--muted);padding:0}
 .psub button.on{background:var(--surface);color:var(--ink)}
 .vh{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
@@ -839,7 +855,7 @@ body.picking{overflow:hidden}
 <section class="tab" id="tab-history" hidden>
   <h2 class="vh">Profile</h2>
   <div class="pcard" id="pcard"></div>
-  <div class="psub" id="psub" role="tablist" aria-label="Profile sections"><button data-p="over" role="tab">Overview</button><button data-p="runs" role="tab">Runs</button><button data-p="badges" role="tab">Badges</button></div>
+  <div class="psub" id="psub" role="tablist" aria-label="Profile sections"><button data-p="over" role="tab">Overview</button><button data-p="runs" role="tab">Runs</button><button data-p="badges" role="tab">Badges</button><button data-p="patches" role="tab">Patches</button></div>
   <div class="ppane" data-pane="over">
   <div id="bkNagH"></div>
   <div class="goalbox" id="goalbox"></div>
@@ -866,6 +882,10 @@ body.picking{overflow:hidden}
   <div class="ppane" data-pane="badges">
   <p class="fhint" id="badgeCount"></p>
   <div class="badges" id="badges"></div>
+  </div>
+  <div class="ppane" data-pane="patches">
+  <p class="fhint" id="patchCount"></p>
+  <div id="patches"></div>
   </div>
 </section>
 <dialog id="holDlg" aria-labelledby="holH">
@@ -1075,6 +1095,16 @@ body.picking{overflow:hidden}
 <dialog id="detail"></dialog>
 <dialog id="sumDlg"></dialog>
 <dialog id="jrDlg"></dialog>
+<dialog id="patchDlg" class="patchdlg"></dialog>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false"><defs>
+  <linearGradient id="gRingGold" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff1a8"/><stop offset=".35" stop-color="#e2b23c"/><stop offset=".6" stop-color="#a87a12"/><stop offset="1" stop-color="#f5d46a"/></linearGradient>
+  <linearGradient id="gRingSilver" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset=".35" stop-color="#c9ced6"/><stop offset=".6" stop-color="#8d949e"/><stop offset="1" stop-color="#e6e9ee"/></linearGradient>
+  <linearGradient id="gRingBronze" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f7c99a"/><stop offset=".35" stop-color="#c98a4b"/><stop offset=".6" stop-color="#8a5526"/><stop offset="1" stop-color="#e0a872"/></linearGradient>
+  <pattern id="pTwill" width="2.6" height="2.6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="2.6" height="2.6" fill="none"/><line x1="0" y1="0" x2="0" y2="2.6" stroke="#000" stroke-width=".9" opacity=".13"/></pattern>
+  <pattern id="pSatin" width="1.9" height="1.9" patternUnits="userSpaceOnUse" patternTransform="rotate(-32)"><line x1="0" y1="0" x2="0" y2="1.9" stroke="#fff" stroke-width=".6" opacity=".26"/><line x1="1.2" y1="0" x2="1.2" y2="1.9" stroke="#000" stroke-width=".35" opacity=".12"/></pattern>
+  <pattern id="pSatin2" width="1.9" height="1.9" patternUnits="userSpaceOnUse" patternTransform="rotate(58)"><line x1="0" y1="0" x2="0" y2="1.9" stroke="#fff" stroke-width=".6" opacity=".32"/><line x1="1.2" y1="0" x2="1.2" y2="1.9" stroke="#000" stroke-width=".35" opacity=".1"/></pattern>
+</defs></svg>
+
 <dialog id="wtDlg"></dialog>
 <dialog id="builder"></dialog>
 <div class="toast" id="toast" hidden></div>
@@ -2192,7 +2222,7 @@ function toRecord(r){
 
 function finishRun(){
   if (!run) return;
-  terr.sent = null; terr.seg = -1; terr.held = -1;
+  terr.sent = null; terr.seg = -1; terr.held = -1; terr.warned = false;
   const wasMoving = live.speed > MOVING;
   let savedId = null;
   if (run.demo){ toast('Demo runs aren’t saved'); }
@@ -2370,6 +2400,7 @@ async function setupControl(svc){
   try { const v = await (await svc.getCharacteristic(FEATURE)).readValue(); const t = v.getUint32(4, true); ctrl.speed = !!(t & 1); ctrl.incline = !!(t & 2); } catch(e){}
   try { const v = await (await svc.getCharacteristic(SPEED_RANGE)).readValue(); ctrl.speedRange = [v.getUint16(0, true) / 100, v.getUint16(2, true) / 100, v.getUint16(4, true) / 100 || 0.1]; } catch(e){}
   try { const v = await (await svc.getCharacteristic(INCLINE_RANGE)).readValue(); ctrl.inclineRange = [v.getInt16(0, true) / 10, v.getInt16(2, true) / 10, v.getUint16(4, true) / 10 || 1]; } catch(e){}
+  store.set(LASTTM, ctrl.incline ? 'incline' : 'flat');
   try {
     cpCh = await svc.getCharacteristic(CONTROL_POINT);
     cpCh.removeEventListener('characteristicvaluechanged', onCpValue);
@@ -2503,7 +2534,7 @@ async function openTreadmill(quiet){
     } else {
       const w = await ppSvc.getCharacteristic(PP_WRITE), c = await ppSvc.getCharacteristic(PP_NOTIFY);
       if (my !== tmAttempt) throw new Error('replaced');
-      pp = { write: w, queue: [] };
+      pp = { write: w, queue: [] }; store.set(LASTTM, 'pitpat');   // remember it, so hill warnings show before you connect next time
       c.removeEventListener('characteristicvaluechanged', onTmValue);
       c.removeEventListener('characteristicvaluechanged', onPpValue);
       c.addEventListener('characteristicvaluechanged', onPpValue);
@@ -2806,7 +2837,7 @@ function renderWorkouts(){
   $('#selCard').innerHTML = `<span class="muted">Selected for your next run</span><strong>${sw ? esc(sw.name) : 'Free run'}</strong>
     <span class="wsum">${sw ? esc(summary(sw)) : 'No targets. Just run.'}</span>${sw ? `<span class="wdur">Takes ${durLabel(sw).toLowerCase()}</span>` : ''}
     ${sw ? `<div class="tl">${workoutTimeline(sw, null)}</div>` : ''}
-    <p class="fhint" style="margin:.5rem 0 0">Start the belt and the steps change automatically, with spoken cues.</p>`;
+    <p class="fhint" style="margin:.5rem 0 0">Start the belt and the steps change automatically, with spoken cues.</p>${clashHtml()}`;
   const favs = new Set(favWorkoutIds());
   const star = w => { const on = favs.has(w.id);
     return `<button class="wstar" data-fav="${esc(w.id)}" aria-pressed="${on}" aria-label="${on ? 'Remove from' : 'Add to'} favourites: ${esc(w.name)}">${on ? '★' : '☆'}</button>`; };
@@ -2850,7 +2881,7 @@ function pickWorkout(id){
   if (run){ wo = null; if (selected) beginWorkout(); }
   renderWorkouts(); renderRunWorkout();
   const w = getWorkout(selected);
-  toast(w ? `${w.name} selected` : 'Free run selected');
+  toast(w ? (hillClash() ? `${w.name} selected. ⚠️ Hill walks only move the incline on free runs` : `${w.name} selected`) : 'Free run selected');
   showTab('run');
 }
 
@@ -3417,10 +3448,11 @@ function glMapBuild(st, km, zoom, others = []){
 // big view can show your journey or a race you're in; with both, a button switches between them
 function glMapSource(){
   if (settings.glMapHide) return null;
-  const st = jState(), race = activeRace();
-  const which = race && st ? (settings.glMapWhich || 'race') : race ? 'race' : st ? 'journey' : null;
-  if (which === 'race') return { kind: 'race', both: !!st, rs: chRaceState(race, run ? run.dist / 1000 : 0), race };
-  return which ? { kind: 'journey', both: !!race, st } : null;
+  // one journey at a time: a race you're in takes over from the solo journey
+  const race = activeRace();
+  if (race) return { kind: 'race', both: false, rs: chRaceState(race, run ? run.dist / 1000 : 0), race };
+  const st = jState();
+  return st ? { kind: 'journey', both: false, st } : null;
 }
 function renderGlMap(){
   const box = $('#glMap'), src = glMapSource();
@@ -4918,7 +4950,7 @@ function syncWeightSetting(){ const last = weighIns().slice(-1)[0]; if (last) se
  * (Natural Earth, public domain) drawn in km, shared by every journey. All of it is built in, so it
  * works offline. settings.journey = { id, start (ms), seen (milestones already celebrated) };
  * finished journeys go in settings.journeysDone. Both live in the profile's settings, so they sync. */
-const JOURNEYS = [{"id":"penyfan","name":"Pen y Fan","blurb":"The roof of the Brecon Beacons from Pont ar Daf, up to Bwlch Duwynt and over Corn Du to the summit, and back.","pts":[["Pont ar Daf",51.8838,-3.488,0],["Bwlch Duwynt",51.884,-3.443,2.6],["Corn Du",51.8803,-3.4458,3.2],["Pen y Fan summit",51.8843,-3.4367,3.8],["Bwlch Duwynt",51.884,-3.443,4.6],["Pont ar Daf",51.8838,-3.488,7.6]],"prof":[[0,440],[1.0,530],[2.6,790],[3.2,873],[3.4,850],[3.8,886],[4.4,790],[6.0,530],[7.6,440]],"kind":"mountain"},{"id":"scafell","name":"Scafell Pike","blurb":"England’s highest mountain from Wasdale Head, up Brown Tongue to Hollow Stones and Lingmell Col, and back the same way.","pts":[["Wasdale Head",54.4425,-3.2867,0],["Lingmell Gill",54.4415,-3.27,1.2],["Hollow Stones",54.444,-3.225,2.9],["Lingmell Col",54.4505,-3.2195,3.6],["Scafell Pike summit",54.4542,-3.2116,4.85],["Hollow Stones",54.444,-3.225,6.8],["Wasdale Head",54.4425,-3.2867,9.7]],"prof":[[0,80],[1.2,200],[2.0,380],[2.9,600],[3.6,730],[4.85,978],[6.1,730],[6.8,600],[7.7,380],[8.5,200],[9.7,80]],"kind":"mountain"},{"id":"penyghent","name":"Pen-y-ghent","blurb":"The lion-shaped Dales peak from Horton-in-Ribblesdale: up past Brackenbottom to the summit, down by Hunt Pot and Horton Scar Lane.","pts":[["Horton-in-Ribblesdale",54.149,-2.293,0],["Brackenbottom",54.145,-2.283,0.8],["Pen-y-ghent summit",54.156,-2.249,4.3],["Hunt Pot",54.162,-2.265,6.0],["Horton Scar Lane",54.157,-2.285,8.3],["Horton-in-Ribblesdale",54.149,-2.293,10.0]],"prof":[[0,230],[0.8,260],[3.0,500],[3.6,580],[4.3,694],[5.3,560],[6.0,430],[8.3,330],[10.0,230]],"kind":"mountain"},{"id":"sevensisters","name":"Seven Sisters","blurb":"The white cliffs of the South Downs from Exceat, over all seven Sisters to Birling Gap and on up to Beachy Head.","pts":[["Exceat",50.775,0.152,0],["Cuckmere Haven",50.76,0.155,2.2],["Haven Brow",50.7575,0.164,3.0],["Birling Gap",50.743,0.201,7.4],["Belle Tout",50.738,0.214,8.6],["Beachy Head",50.7383,0.2405,10.5]],"prof":[[0,5],[2.2,2],[3.0,77],[3.6,40],[3.9,65],[4.3,35],[4.6,66],[5.0,40],[5.3,66],[5.7,45],[6.0,73],[6.4,45],[6.7,75],[7.0,40],[7.4,30],[8.6,70],[9.2,40],[10.5,162]],"kind":"mountain"},{"id":"mamtor","name":"Mam Tor and the Great Ridge","blurb":"The Peak District classic from Castleton: up to Mam Tor, then along the Great Ridge over Hollins Cross and Back Tor to Lose Hill.","pts":[["Castleton",53.3437,-1.7766,0],["Mam Nick",53.351,-1.815,3.0],["Mam Tor",53.3491,-1.8104,3.6],["Hollins Cross",53.3567,-1.7955,5.0],["Back Tor",53.361,-1.782,6.2],["Lose Hill",53.3667,-1.7715,7.2],["Castleton",53.3437,-1.7766,10.5]],"prof":[[0,180],[1.5,240],[3.0,450],[3.6,517],[5.0,400],[5.8,470],[6.2,538],[7.2,476],[8.5,300],[10.5,180]],"kind":"mountain"},{"id":"malham","name":"Malham Cove and Gordale Scar","blurb":"Limestone wonders from Malham: Janet’s Foss, the gorge at Gordale Scar, Malham Tarn and the top of Malham Cove.","pts":[["Malham",54.06,-2.152,0],["Janet’s Foss",54.0645,-2.1325,1.6],["Gordale Scar",54.0715,-2.1265,2.6],["Malham Tarn",54.0965,-2.167,7.0],["Watlowes",54.079,-2.162,8.6],["Malham Cove",54.0715,-2.158,9.4],["Malham",54.06,-2.152,10.9]],"prof":[[0,190],[1.6,230],[2.6,260],[3.4,380],[5.0,400],[7.0,377],[8.6,330],[9.4,330],[9.8,220],[10.9,190]],"kind":"mountain"},{"id":"withens","name":"Haworth to Top Withens","blurb":"Brontë country from the Parsonage in Haworth, across the moor past the Brontë Waterfalls to the ruin of Top Withens, and back.","pts":[["Haworth",53.831,-1.958,0],["Penistone Hill",53.825,-1.9725,1.2],["Brontë Waterfalls",53.828,-2.006,3.6],["Top Withens",53.8255,-2.027,5.5],["Brontë Waterfalls",53.828,-2.006,7.4],["Haworth",53.831,-1.958,11.0]],"prof":[[0,250],[1.2,320],[2.5,300],[3.6,280],[4.4,350],[5.5,430],[6.6,350],[7.4,280],[8.5,300],[9.8,320],[11.0,250]],"kind":"mountain"},{"id":"coniston","name":"Old Man of Coniston","blurb":"Up through the Coppermines Valley to Low Water and the summit above Coniston Water, and back down.","pts":[["Coniston",54.369,-3.075,0],["Coppermines Valley",54.376,-3.094,2.0],["Low Water",54.3725,-3.112,4.4],["Old Man summit",54.37,-3.121,5.5],["Low Water",54.3725,-3.112,6.6],["Coniston",54.369,-3.075,11.0]],"prof":[[0,50],[2.0,180],[3.2,350],[4.4,550],[5.5,803],[6.6,550],[7.8,350],[9.0,180],[11.0,50]],"kind":"mountain"},{"id":"snowdon","name":"Snowdon / Yr Wyddfa","blurb":"Up the Pyg Track from Pen-y-Pass to the summit of Wales, then down the Miners’ Track past Glaslyn and Llyn Llydaw.","pts":[["Pen-y-Pass",53.0806,-4.0207,0],["Bwlch y Moch",53.0786,-4.0369,1.6],["Bwlch Glas",53.0718,-4.075,5.0],["Snowdon summit",53.0685,-4.0762,5.6],["Glaslyn",53.0735,-4.06,7.8],["Llyn Llydaw",53.0745,-4.043,9.0],["Pen-y-Pass",53.0806,-4.0207,11.5]],"prof":[[0,359],[1.6,570],[2.8,640],[3.9,750],[5.0,990],[5.6,1085],[6.2,990],[7.1,750],[7.8,600],[9.0,440],[11.5,359]],"kind":"mountain"},{"id":"stoodley","name":"Stoodley Pike","blurb":"Up from Hebden Bridge to the monument on Stoodley Pike, down to Mankinholes and back along the Rochdale Canal.","pts":[["Hebden Bridge",53.7395,-2.012,0],["Horsehold",53.731,-2.023,1.8],["Stoodley Pike",53.72,-2.045,4.8],["Mankinholes",53.713,-2.07,6.5],["Lob Mill",53.721,-2.061,8.0],["Charlestown",53.734,-2.033,9.8],["Hebden Bridge",53.7395,-2.012,11.5]],"prof":[[0,100],[1.8,250],[3.0,330],[4.8,400],[6.5,250],[8.0,130],[11.5,100]],"kind":"mountain"},{"id":"benlomond","name":"Ben Lomond","blurb":"Scotland’s most southerly Munro from Rowardennan on Loch Lomond, by the tourist path and back.","pts":[["Rowardennan",56.153,-4.642,0],["Tree line",56.16,-4.626,1.5],["Sròn Aonaich",56.176,-4.62,3.5],["Ben Lomond summit",56.1903,-4.6331,6.0],["Sròn Aonaich",56.176,-4.62,8.5],["Rowardennan",56.153,-4.642,12.0]],"prof":[[0,30],[1.5,250],[3.5,600],[4.8,750],[6.0,974],[7.2,750],[8.5,600],[10.5,250],[12.0,30]],"kind":"mountain"},{"id":"helvellyn","name":"Helvellyn","blurb":"The Lake District favourite from Glenridding: over the Hole-in-the-Wall and along Striding Edge to the summit, down Swirral Edge to Red Tarn.","pts":[["Glenridding",54.544,-2.95,0],["Hole-in-the-Wall",54.53,-2.9917,4.3],["Striding Edge",54.5265,-3.0005,5.3],["Helvellyn summit",54.5271,-3.0164,6.3],["Swirral Edge",54.533,-3.013,7.0],["Red Tarn",54.53,-3.005,7.8],["Glenridding",54.544,-2.95,12.4]],"prof":[[0,150],[1.2,230],[2.5,450],[4.3,860],[5.3,860],[6.3,950],[7.0,830],[7.8,720],[9.5,450],[12.4,150]],"kind":"mountain"},{"id":"kinder","name":"Kinder Scout","blurb":"The Peak’s high plateau from Edale: up Grindsbrook Clough, round the edge to Kinder Downfall and Kinder Low, down Jacob’s Ladder.","pts":[["Edale",53.3685,-1.817,0],["Grindsbrook Clough",53.383,-1.835,3.5],["Kinder Downfall",53.394,-1.877,7.0],["Kinder Low",53.38,-1.879,8.6],["Jacob’s Ladder",53.369,-1.853,10.5],["Upper Booth",53.3655,-1.841,11.5],["Edale",53.3685,-1.817,14.0]],"prof":[[0,250],[1.5,300],[2.7,400],[3.5,590],[5.0,610],[7.0,600],[8.6,633],[9.4,560],[10.5,330],[11.5,290],[14.0,250]],"kind":"mountain"},{"id":"skiddaw","name":"Skiddaw","blurb":"From Keswick past Latrigg and up the long tourist path over Jenkin Hill to the summit, and back.","pts":[["Keswick",54.601,-3.134,0],["Latrigg car park",54.617,-3.12,3.0],["Jenkin Hill",54.637,-3.13,5.0],["Skiddaw summit",54.651,-3.1475,7.6],["Jenkin Hill",54.637,-3.13,10.2],["Keswick",54.601,-3.134,15.2]],"prof":[[0,80],[1.5,150],[3.0,300],[4.0,520],[5.0,730],[6.5,850],[7.6,931],[8.7,850],[10.2,730],[11.2,520],[12.2,300],[13.7,150],[15.2,80]],"kind":"mountain"},{"id":"ingleborough","name":"Ingleborough","blurb":"From Clapham through the estate woods past Ingleborough Cave, Trow Gill and Gaping Gill to the flat-topped summit, and back.","pts":[["Clapham",54.118,-2.392,0],["Ingleborough Cave",54.13,-2.378,2.5],["Gaping Gill",54.15,-2.38,5.0],["Ingleborough summit",54.166,-2.398,8.3],["Gaping Gill",54.15,-2.38,11.6],["Clapham",54.118,-2.392,16.6]],"prof":[[0,160],[2.5,260],[3.5,320],[5.0,400],[6.6,600],[8.3,723],[10.0,600],[11.6,400],[13.1,320],[14.1,260],[16.6,160]],"kind":"mountain"},{"id":"bennevis","name":"Ben Nevis","blurb":"Britain’s highest mountain by the Mountain Track from Glen Nevis, up past the Halfway Lochan and the zigzags to the summit plateau, and back down.","pts":[["Glen Nevis Visitor Centre",56.8046,-5.0759,0],["Halfway Lochan",56.81,-5.035,4.3],["Red Burn",56.802,-5.028,5.2],["Ben Nevis summit",56.7969,-5.0036,8.5],["Halfway Lochan",56.81,-5.035,12.7],["Glen Nevis Visitor Centre",56.8046,-5.0759,17.0]],"prof":[[0,20],[1.0,60],[2.0,250],[3.0,400],[4.3,570],[5.2,670],[6.2,900],[7.4,1150],[8.0,1290],[8.5,1345],[9.0,1290],[9.6,1150],[10.8,900],[11.8,670],[12.7,570],[14.0,400],[15.0,250],[16.0,60],[17.0,20]],"kind":"mountain"},{"id":"3peaks","name":"Yorkshire Three Peaks","blurb":"The classic Dales challenge: Pen-y-ghent, Whernside and Ingleborough in one loop from Horton-in-Ribblesdale.","pts":[["Horton-in-Ribblesdale",54.149,-2.293,0.0],["Pen-y-ghent",54.156,-2.249,4.3],["Ribblehead Viaduct",54.21,-2.37,21.2],["Whernside",54.227,-2.402,26.6],["Chapel-le-Dale",54.187,-2.411,30.6],["Ingleborough",54.166,-2.398,33.8],["Horton-in-Ribblesdale",54.149,-2.293,39.4]],"prof":[[0,230],[2.2,350],[4.3,694],[8,420],[14,330],[21.2,300],[24.0,450],[26.6,736],[29,450],[30.6,290],[32.6,550],[33.8,723],[36,500],[39.4,230]],"kind":"mountain"},{"id":"zennor","name":"St Ives to Zennor","blurb":"The South West Coast Path from St Ives harbour along wild granite cliffs to the village of Zennor and the Tinners Arms.","pts":[["St Ives",50.214,-5.48,0],["Clodgy Point",50.216,-5.4985,1.8],["Pen Enys Point",50.212,-5.53,4.6],["Zennor Head",50.197,-5.57,9.0],["Zennor",50.1915,-5.567,10.0]],"kind":"walk"},{"id":"saltaire","name":"Saltaire to Five Rise Locks","blurb":"Along the Leeds and Liverpool Canal from Salts Mill in Saltaire to the famous staircase locks at Bingley, and back.","pts":[["Saltaire",53.838,-1.79,0],["Hirst Lock",53.844,-1.798,1.5],["Dowley Gap",53.847,-1.81,2.6],["Bingley Three Rise",53.8505,-1.837,4.4],["Five Rise Locks",53.8555,-1.8415,5.2],["Bingley Three Rise",53.8505,-1.837,6.0],["Dowley Gap",53.847,-1.81,7.8],["Hirst Lock",53.844,-1.798,8.9],["Saltaire",53.838,-1.79,10.4]],"kind":"walk"},{"id":"whitby","name":"Robin Hood’s Bay to Whitby","blurb":"The Cleveland Way clifftop path from Robin Hood’s Bay past Saltwick Bay to Whitby Abbey and down the 199 steps.","pts":[["Robin Hood’s Bay",54.434,-0.534,0],["Ness Point",54.448,-0.54,1.8],["Maw Wyke Hole",54.465,-0.565,5.0],["Saltwick Bay",54.484,-0.588,8.8],["Whitby Abbey",54.4885,-0.6075,10.6],["Whitby harbour",54.4885,-0.6135,11.2]],"kind":"walk"},{"id":"dunstanburgh","name":"Craster and Dunstanburgh Castle","blurb":"The Northumberland coast from Craster past the ruins of Dunstanburgh Castle and round Embleton Bay to Low Newton, and back.","pts":[["Craster",55.472,-1.592,0],["Dunstanburgh Castle",55.4895,-1.595,2.2],["Embleton Bay",55.5,-1.607,3.6],["Low Newton-by-the-Sea",55.517,-1.617,5.6],["Embleton Bay",55.5,-1.607,7.6],["Dunstanburgh Castle",55.4895,-1.595,9.0],["Craster",55.472,-1.592,11.2]],"kind":"walk"},{"id":"thamespath","name":"Thames Path: Richmond to Hampton Court","blurb":"Riverside London from Richmond Bridge past Ham House and Teddington Lock to Kingston and Hampton Court Palace.","pts":[["Richmond Bridge",51.457,-0.307,0],["Ham House",51.4445,-0.3125,2.0],["Teddington Lock",51.431,-0.322,4.3],["Kingston Bridge",51.412,-0.308,7.3],["Hampton Court Palace",51.4035,-0.3375,12.0]],"kind":"walk"},{"id":"fountains","name":"Ripon to Fountains Abbey","blurb":"From Ripon Cathedral through Studley Royal deer park to the water gardens and the great ruin of Fountains Abbey, and back.","pts":[["Ripon",54.135,-1.5205,0],["Studley Roger",54.13,-1.5455,2.2],["St Mary’s Church",54.1185,-1.5745,4.5],["Fountains Abbey",54.1095,-1.5815,6.5],["St Mary’s Church",54.1185,-1.5745,8.5],["Studley Roger",54.13,-1.5455,10.8],["Ripon",54.135,-1.5205,13.0]],"kind":"walk"},{"id":"monsal","name":"Monsal Trail","blurb":"The old Midland railway through the Peak District, from Wye Dale through the tunnels and over Monsal Head viaduct to Bakewell.","pts":[["Wye Dale",53.255,-1.815,0],["Chee Dale",53.255,-1.792,2.0],["Miller’s Dale",53.255,-1.76,4.3],["Litton Mill",53.251,-1.747,5.6],["Monsal Head Viaduct",53.24,-1.727,8.0],["Hassop Station",53.224,-1.677,12.0],["Bakewell",53.215,-1.668,13.7]],"kind":"walk"},{"id":"regentscanal","name":"Regent’s Canal","blurb":"London’s towpath from Little Venice past the zoo, Camden Lock, King’s Cross and Victoria Park to Limehouse Basin.","pts":[["Little Venice",51.522,-0.183,0],["London Zoo",51.5355,-0.1535,2.6],["Camden Lock",51.541,-0.146,3.5],["King’s Cross",51.5355,-0.125,5.2],["Angel",51.534,-0.105,6.6],["Victoria Park",51.537,-0.043,10.6],["Mile End",51.525,-0.033,11.9],["Limehouse Basin",51.511,-0.0355,13.8]],"kind":"walk"},{"id":"waterofleith","name":"Water of Leith Walkway","blurb":"Edinburgh’s riverside path from Balerno through Currie and Slateford, Dean Village and Stockbridge to the Shore at Leith.","pts":[["Balerno",55.884,-3.338,0],["Currie",55.896,-3.308,3.0],["Juniper Green",55.905,-3.286,5.0],["Slateford",55.9235,-3.249,8.5],["Roseburn",55.9435,-3.237,11.3],["Dean Village",55.9525,-3.2165,13.0],["Stockbridge",55.958,-3.206,14.2],["Leith Shore",55.9755,-3.17,19.6]],"kind":"walk"},{"id":"tissington","name":"Tissington Trail","blurb":"An old railway line from Ashbourne up through Tissington and Hartington to Parsley Hay, with views over Dovedale.","pts":[["Ashbourne",53.023,-1.736,0],["Thorpe",53.048,-1.757,3.2],["Tissington",53.0675,-1.7365,6.6],["Alsop",53.096,-1.759,11.0],["Hartington Station",53.1385,-1.792,17.0],["Parsley Hay",53.17,-1.793,21.0]],"kind":"walk"},{"id":"marathon","name":"London Marathon","blurb":"The marathon distance on the London course, from Blackheath past the Cutty Sark, over Tower Bridge and round Canary Wharf to the finish on The Mall.","pts":[["Blackheath",51.469,0.003,0],["Woolwich",51.488,0.067,4.8],["Cutty Sark",51.483,-0.01,10.5],["Rotherhithe",51.498,-0.05,16.0],["Tower Bridge",51.5055,-0.0754,20.0],["Limehouse",51.512,-0.039,23.0],["Mudchute",51.491,-0.014,26.5],["Canary Wharf",51.505,-0.019,30.0],["Tower of London",51.508,-0.076,36.0],["Blackfriars",51.511,-0.104,38.6],["Big Ben",51.5007,-0.1246,41.0],["The Mall",51.5045,-0.135,42.2]]},{"id":"dalesway","name":"Dales Way","blurb":"Riverside walking from Ilkley up Wharfedale and over to Dentdale, ending on the shore of Windermere.","pts":[["Ilkley",53.925,-1.822,0.0],["Bolton Abbey",53.983,-1.889,10.5],["Burnsall",54.047,-1.952,19.3],["Grassington",54.071,-1.998,24.1],["Kettlewell",54.146,-2.047,35.4],["Buckden",54.191,-2.091,41.8],["Cam Houses",54.233,-2.268,56.3],["Dent",54.278,-2.454,74.0],["Sedbergh",54.322,-2.528,82.1],["Burneside",54.355,-2.763,109.4],["Staveley",54.376,-2.818,112.7],["Bowness-on-Windermere",54.364,-2.919,127.1]]},{"id":"hadrian","name":"Hadrian’s Wall Path","blurb":"Coast to coast along the Roman wall, from Wallsend on the Tyne past Housesteads fort to Bowness-on-Solway.","pts":[["Wallsend",54.988,-1.534,0.0],["Newcastle Quayside",54.969,-1.606,8.0],["Heddon-on-the-Wall",54.997,-1.795,24.1],["Chollerford",55.033,-2.12,51.5],["Housesteads Fort",55.013,-2.331,67.6],["Steel Rigg",54.996,-2.392,74.0],["Greenhead",54.982,-2.534,85.3],["Birdoswald",54.991,-2.602,91.7],["Carlisle",54.892,-2.932,112.7],["Burgh by Sands",54.921,-3.048,122.3],["Bowness-on-Solway",54.953,-3.212,135.2]]},{"id":"c2c","name":"Coast to Coast","blurb":"Wainwright’s walk across northern England, from the Irish Sea to the North Sea through the Lake District, the Dales and the North York Moors.","pts":[["St Bees",54.492,-3.594,0.0],["Ennerdale Bridge",54.524,-3.432,22.5],["Rosthwaite",54.523,-3.147,46.7],["Grasmere",54.459,-3.024,61.2],["Patterdale",54.531,-2.937,74.0],["Shap",54.532,-2.68,99.8],["Orton",54.468,-2.59,112.7],["Kirkby Stephen",54.472,-2.349,132.0],["Keld",54.405,-2.169,152.9],["Reeth",54.388,-1.943,170.6],["Richmond",54.403,-1.737,186.7],["Danby Wiske",54.371,-1.484,209.2],["Ingleby Cross",54.406,-1.309,223.7],["Clay Bank Top",54.423,-1.13,243.0],["Blakey Ridge",54.38,-0.958,257.5],["Glaisdale",54.439,-0.795,272.0],["Grosmont",54.436,-0.725,276.8],["Robin Hood’s Bay",54.434,-0.534,302.6]]},{"id":"pennine","name":"Pennine Way","blurb":"Britain’s first National Trail, up the backbone of England from the Peak District to the Scottish Borders.","pts":[["Edale",53.367,-1.816,0.0],["Crowden",53.491,-1.893,25.7],["Standedge",53.59,-1.958,43.5],["Hebden Bridge",53.742,-2.013,64.4],["Ponden",53.84,-2.023,78.9],["Ickornshaw",53.896,-2.044,91.7],["Gargrave",53.983,-2.105,112.7],["Malham",54.061,-2.15,122.3],["Horton-in-Ribblesdale",54.149,-2.293,144.8],["Hawes",54.304,-2.197,167.4],["Keld",54.405,-2.169,188.3],["Tan Hill",54.457,-2.163,194.7],["Middleton-in-Teesdale",54.626,-2.082,222.1],["Dufton",54.629,-2.488,254.3],["Alston",54.811,-2.438,286.5],["Greenhead",54.982,-2.534,312.2],["Bellingham",55.144,-2.255,347.6],["Byrness",55.314,-2.366,371.8],["Kirk Yetholm",55.547,-2.274,431.3]]},{"id":"lejog","name":"Land’s End to John o’Groats","blurb":"The classic end-to-end, the length of Great Britain by road from Cornwall to Caithness.","pts":[["Land’s End",50.066,-5.714,0.0],["Penzance",50.118,-5.537,16.8],["Truro",50.263,-5.051,62.8],["Bodmin",50.471,-4.718,102.7],["Launceston",50.636,-4.36,140.4],["Okehampton",50.739,-4.004,173.7],["Exeter",50.718,-3.534,213.7],["Taunton",51.015,-3.103,267.7],["Bridgwater",51.128,-3.003,285.1],["Bristol",51.455,-2.588,341.1],["Gloucester",51.864,-2.244,403.0],["Worcester",52.193,-2.221,447.2],["Bridgnorth",52.535,-2.419,495.9],["Shrewsbury",52.708,-2.754,531.7],["Whitchurch",52.969,-2.682,567.2],["Warrington",53.39,-2.597,624.1],["Preston",53.763,-2.703,674.9],["Lancaster",54.047,-2.801,713.7],["Kendal",54.328,-2.746,751.7],["Penrith",54.664,-2.752,796.8],["Carlisle",54.892,-2.932,830.4],["Gretna",54.995,-3.065,847.6],["Moffat",55.333,-3.442,901.4],["Edinburgh",55.953,-3.188,986.8],["Perth",56.396,-3.437,1049.1],["Pitlochry",56.703,-3.734,1095.7],["Aviemore",57.195,-3.825,1162.1],["Inverness",57.478,-4.224,1209.8],["Dingwall",57.596,-4.429,1231.5],["Tain",57.811,-4.055,1270.8],["Helmsdale",58.117,-3.65,1321.0],["Wick",58.438,-3.093,1379.3],["John o’Groats",58.644,-3.07,1407.0]]}];
+const JOURNEYS = [{"id":"arthurseat","kind":"mountain","name":"Arthur’s Seat","blurb":"Edinburgh’s extinct volcano from Holyrood Palace, along Salisbury Crags to the summit and down past Dunsapie Loch.","pts":[["Holyrood Palace",55.9527,-3.172,0],["Salisbury Crags",55.948,-3.166,1.0],["Arthur’s Seat summit",55.9441,-3.1618,2.4],["Dunsapie Loch",55.948,-3.155,3.4],["St Margaret’s Loch",55.953,-3.161,4.4],["Holyrood Palace",55.9527,-3.172,5.0]],"prof":[[0,40],[1.0,110],[1.8,180],[2.4,251],[3.4,160],[4.4,60],[5.0,40]]},{"id":"idwal","kind":"mountain","name":"Llyn Idwal","blurb":"Snowdonia’s classic short walk from Ogwen Cottage up to the glacial lake under the Devil’s Kitchen, and round the shore.","pts":[["Ogwen Cottage",53.1235,-4.0175,0],["Llyn Idwal",53.115,-4.024,1.3],["Devil’s Kitchen",53.109,-4.03,2.3],["Idwal Slabs",53.112,-4.019,3.4],["Ogwen Cottage",53.1235,-4.0175,5.0]],"prof":[[0,300],[1.3,370],[2.3,450],[3.4,390],[5.0,300]]},{"id":"catbells","kind":"mountain","name":"Catbells","blurb":"The Lake District’s best-loved little fell from Hawes End: up the ridge over Skelgill Bank to the summit, back above Derwentwater.","pts":[["Hawes End",54.584,-3.169,0],["Skelgill Bank",54.577,-3.168,1.5],["Catbells summit",54.5683,-3.17,2.6],["Hause Gate",54.56,-3.169,3.4],["Brandelhow",54.567,-3.1615,4.4],["Hawes End",54.584,-3.169,6.0]],"prof":[[0,90],[1.5,330],[2.6,451],[3.4,360],[4.2,150],[6.0,90]]},{"id":"penyfan","name":"Pen y Fan","blurb":"The roof of the Brecon Beacons from Pont ar Daf, up to Bwlch Duwynt and over Corn Du to the summit, and back.","pts":[["Pont ar Daf",51.8838,-3.488,0],["Bwlch Duwynt",51.884,-3.443,2.6],["Corn Du",51.8803,-3.4458,3.2],["Pen y Fan summit",51.8843,-3.4367,3.8],["Bwlch Duwynt",51.884,-3.443,4.6],["Pont ar Daf",51.8838,-3.488,7.6]],"prof":[[0,440],[1.0,530],[2.6,790],[3.2,873],[3.4,850],[3.8,886],[4.4,790],[6.0,530],[7.6,440]],"kind":"mountain"},{"id":"scafell","name":"Scafell Pike","blurb":"England’s highest mountain from Wasdale Head, up Brown Tongue to Hollow Stones and Lingmell Col, and back the same way.","pts":[["Wasdale Head",54.4425,-3.2867,0],["Lingmell Gill",54.4415,-3.27,1.2],["Hollow Stones",54.444,-3.225,2.9],["Lingmell Col",54.4505,-3.2195,3.6],["Scafell Pike summit",54.4542,-3.2116,4.85],["Hollow Stones",54.444,-3.225,6.8],["Wasdale Head",54.4425,-3.2867,9.7]],"prof":[[0,80],[1.2,200],[2.0,380],[2.9,600],[3.6,730],[4.85,978],[6.1,730],[6.8,600],[7.7,380],[8.5,200],[9.7,80]],"kind":"mountain"},{"id":"ilkleymoor","kind":"mountain","name":"Ilkley Moor","blurb":"Up from Ilkley to the Cow and Calf rocks, over the moor to the Twelve Apostles stone circle, and back down past White Wells.","pts":[["Ilkley",53.925,-1.822,0],["Cow and Calf",53.9175,-1.8015,2.0],["Pancake Stone",53.915,-1.813,3.0],["Twelve Apostles",53.8955,-1.8295,5.0],["White Wells",53.917,-1.8265,7.6],["Ilkley",53.925,-1.822,9.8]],"prof":[[0,100],[2.0,270],[3.0,330],[5.0,400],[7.6,250],[9.8,100]]},{"id":"penyghent","name":"Pen-y-ghent","blurb":"The lion-shaped Dales peak from Horton-in-Ribblesdale: up past Brackenbottom to the summit, down by Hunt Pot and Horton Scar Lane.","pts":[["Horton-in-Ribblesdale",54.149,-2.293,0],["Brackenbottom",54.145,-2.283,0.8],["Pen-y-ghent summit",54.156,-2.249,4.3],["Hunt Pot",54.162,-2.265,6.0],["Horton Scar Lane",54.157,-2.285,8.3],["Horton-in-Ribblesdale",54.149,-2.293,10.0]],"prof":[[0,230],[0.8,260],[3.0,500],[3.6,580],[4.3,694],[5.3,560],[6.0,430],[8.3,330],[10.0,230]],"kind":"mountain"},{"id":"cadair","kind":"mountain","name":"Cadair Idris","blurb":"The Minffordd Path in Snowdonia’s south: up through the oakwoods to Llyn Cau, round the rim over Craig Cau to Penygadair, and back.","pts":[["Minffordd",52.688,-3.844,0],["Llyn Cau",52.6935,-3.882,3.0],["Craig Cau",52.696,-3.895,4.2],["Penygadair summit",52.6995,-3.91,5.2],["Craig Cau",52.696,-3.895,6.2],["Llyn Cau",52.6935,-3.882,7.4],["Minffordd",52.688,-3.844,10.4]],"prof":[[0,80],[1.2,300],[3.0,470],[4.2,791],[4.6,740],[5.2,893],[5.8,740],[6.2,791],[7.4,470],[9.2,300],[10.4,80]]},{"id":"sevensisters","name":"Seven Sisters","blurb":"The white cliffs of the South Downs from Exceat, over all seven Sisters to Birling Gap and on up to Beachy Head.","pts":[["Exceat",50.775,0.152,0],["Cuckmere Haven",50.76,0.155,2.2],["Haven Brow",50.7575,0.164,3.0],["Birling Gap",50.743,0.201,7.4],["Belle Tout",50.738,0.214,8.6],["Beachy Head",50.7383,0.2405,10.5]],"prof":[[0,5],[2.2,2],[3.0,77],[3.6,40],[3.9,65],[4.3,35],[4.6,66],[5.0,40],[5.3,66],[5.7,45],[6.0,73],[6.4,45],[6.7,75],[7.0,40],[7.4,30],[8.6,70],[9.2,40],[10.5,162]],"kind":"mountain"},{"id":"mamtor","name":"Mam Tor and the Great Ridge","blurb":"The Peak District classic from Castleton: up to Mam Tor, then along the Great Ridge over Hollins Cross and Back Tor to Lose Hill.","pts":[["Castleton",53.3437,-1.7766,0],["Mam Nick",53.351,-1.815,3.0],["Mam Tor",53.3491,-1.8104,3.6],["Hollins Cross",53.3567,-1.7955,5.0],["Back Tor",53.361,-1.782,6.2],["Lose Hill",53.3667,-1.7715,7.2],["Castleton",53.3437,-1.7766,10.5]],"prof":[[0,180],[1.5,240],[3.0,450],[3.6,517],[5.0,400],[5.8,470],[6.2,538],[7.2,476],[8.5,300],[10.5,180]],"kind":"mountain"},{"id":"malham","name":"Malham Cove and Gordale Scar","blurb":"Limestone wonders from Malham: Janet’s Foss, the gorge at Gordale Scar, Malham Tarn and the top of Malham Cove.","pts":[["Malham",54.06,-2.152,0],["Janet’s Foss",54.0645,-2.1325,1.6],["Gordale Scar",54.0715,-2.1265,2.6],["Malham Tarn",54.0965,-2.167,7.0],["Watlowes",54.079,-2.162,8.6],["Malham Cove",54.0715,-2.158,9.4],["Malham",54.06,-2.152,10.9]],"prof":[[0,190],[1.6,230],[2.6,260],[3.4,380],[5.0,400],[7.0,377],[8.6,330],[9.4,330],[9.8,220],[10.9,190]],"kind":"mountain"},{"id":"withens","name":"Haworth to Top Withens","blurb":"Brontë country from the Parsonage in Haworth, across the moor past the Brontë Waterfalls to the ruin of Top Withens, and back.","pts":[["Haworth",53.831,-1.958,0],["Penistone Hill",53.825,-1.9725,1.2],["Brontë Waterfalls",53.828,-2.006,3.6],["Top Withens",53.8255,-2.027,5.5],["Brontë Waterfalls",53.828,-2.006,7.4],["Haworth",53.831,-1.958,11.0]],"prof":[[0,250],[1.2,320],[2.5,300],[3.6,280],[4.4,350],[5.5,430],[6.6,350],[7.4,280],[8.5,300],[9.8,320],[11.0,250]],"kind":"mountain"},{"id":"coniston","name":"Old Man of Coniston","blurb":"Up through the Coppermines Valley to Low Water and the summit above Coniston Water, and back down.","pts":[["Coniston",54.369,-3.075,0],["Coppermines Valley",54.376,-3.094,2.0],["Low Water",54.3725,-3.112,4.4],["Old Man summit",54.37,-3.121,5.5],["Low Water",54.3725,-3.112,6.6],["Coniston",54.369,-3.075,11.0]],"prof":[[0,50],[2.0,180],[3.2,350],[4.4,550],[5.5,803],[6.6,550],[7.8,350],[9.0,180],[11.0,50]],"kind":"mountain"},{"id":"snowdon","name":"Snowdon / Yr Wyddfa","blurb":"Up the Pyg Track from Pen-y-Pass to the summit of Wales, then down the Miners’ Track past Glaslyn and Llyn Llydaw.","pts":[["Pen-y-Pass",53.0806,-4.0207,0],["Bwlch y Moch",53.0786,-4.0369,1.6],["Bwlch Glas",53.0718,-4.075,5.0],["Snowdon summit",53.0685,-4.0762,5.6],["Glaslyn",53.0735,-4.06,7.8],["Llyn Llydaw",53.0745,-4.043,9.0],["Pen-y-Pass",53.0806,-4.0207,11.5]],"prof":[[0,359],[1.6,570],[2.8,640],[3.9,750],[5.0,990],[5.6,1085],[6.2,990],[7.1,750],[7.8,600],[9.0,440],[11.5,359]],"kind":"mountain"},{"id":"stoodley","name":"Stoodley Pike","blurb":"Up from Hebden Bridge to the monument on Stoodley Pike, down to Mankinholes and back along the Rochdale Canal.","pts":[["Hebden Bridge",53.7395,-2.012,0],["Horsehold",53.731,-2.023,1.8],["Stoodley Pike",53.72,-2.045,4.8],["Mankinholes",53.713,-2.07,6.5],["Lob Mill",53.721,-2.061,8.0],["Charlestown",53.734,-2.033,9.8],["Hebden Bridge",53.7395,-2.012,11.5]],"prof":[[0,100],[1.8,250],[3.0,330],[4.8,400],[6.5,250],[8.0,130],[11.5,100]],"kind":"mountain"},{"id":"benlomond","name":"Ben Lomond","blurb":"Scotland’s most southerly Munro from Rowardennan on Loch Lomond, by the tourist path and back.","pts":[["Rowardennan",56.153,-4.642,0],["Tree line",56.16,-4.626,1.5],["Sròn Aonaich",56.176,-4.62,3.5],["Ben Lomond summit",56.1903,-4.6331,6.0],["Sròn Aonaich",56.176,-4.62,8.5],["Rowardennan",56.153,-4.642,12.0]],"prof":[[0,30],[1.5,250],[3.5,600],[4.8,750],[6.0,974],[7.2,750],[8.5,600],[10.5,250],[12.0,30]],"kind":"mountain"},{"id":"helvellyn","name":"Helvellyn","blurb":"The Lake District favourite from Glenridding: over the Hole-in-the-Wall and along Striding Edge to the summit, down Swirral Edge to Red Tarn.","pts":[["Glenridding",54.544,-2.95,0],["Hole-in-the-Wall",54.53,-2.9917,4.3],["Striding Edge",54.5265,-3.0005,5.3],["Helvellyn summit",54.5271,-3.0164,6.3],["Swirral Edge",54.533,-3.013,7.0],["Red Tarn",54.53,-3.005,7.8],["Glenridding",54.544,-2.95,12.4]],"prof":[[0,150],[1.2,230],[2.5,450],[4.3,860],[5.3,860],[6.3,950],[7.0,830],[7.8,720],[9.5,450],[12.4,150]],"kind":"mountain"},{"id":"malvern","kind":"mountain","name":"Malvern Hills","blurb":"End to end along the ridge, from Great Malvern over North Hill and the Worcestershire Beacon to British Camp and Chase End Hill.","pts":[["Great Malvern",52.111,-2.326,0],["North Hill",52.123,-2.324,1.5],["Worcestershire Beacon",52.1043,-2.3394,3.2],["Wyche Cutting",52.088,-2.339,5.2],["British Camp",52.063,-2.338,8.5],["Midsummer Hill",52.045,-2.343,10.8],["Chase End Hill",52.023,-2.351,13.8]],"prof":[[0,140],[1.5,397],[2.3,330],[3.2,425],[5.2,270],[7.0,300],[8.5,338],[9.5,250],[10.8,284],[12.3,200],[13.8,191]]},{"id":"kinder","name":"Kinder Scout","blurb":"The Peak’s high plateau from Edale: up Grindsbrook Clough, round the edge to Kinder Downfall and Kinder Low, down Jacob’s Ladder.","pts":[["Edale",53.3685,-1.817,0],["Grindsbrook Clough",53.383,-1.835,3.5],["Kinder Downfall",53.394,-1.877,7.0],["Kinder Low",53.38,-1.879,8.6],["Jacob’s Ladder",53.369,-1.853,10.5],["Upper Booth",53.3655,-1.841,11.5],["Edale",53.3685,-1.817,14.0]],"prof":[[0,250],[1.5,300],[2.7,400],[3.5,590],[5.0,610],[7.0,600],[8.6,633],[9.4,560],[10.5,330],[11.5,290],[14.0,250]],"kind":"mountain"},{"id":"skiddaw","name":"Skiddaw","blurb":"From Keswick past Latrigg and up the long tourist path over Jenkin Hill to the summit, and back.","pts":[["Keswick",54.601,-3.134,0],["Latrigg car park",54.617,-3.12,3.0],["Jenkin Hill",54.637,-3.13,5.0],["Skiddaw summit",54.651,-3.1475,7.6],["Jenkin Hill",54.637,-3.13,10.2],["Keswick",54.601,-3.134,15.2]],"prof":[[0,80],[1.5,150],[3.0,300],[4.0,520],[5.0,730],[6.5,850],[7.6,931],[8.7,850],[10.2,730],[11.2,520],[12.2,300],[13.7,150],[15.2,80]],"kind":"mountain"},{"id":"ingleborough","name":"Ingleborough","blurb":"From Clapham through the estate woods past Ingleborough Cave, Trow Gill and Gaping Gill to the flat-topped summit, and back.","pts":[["Clapham",54.118,-2.392,0],["Ingleborough Cave",54.13,-2.378,2.5],["Gaping Gill",54.15,-2.38,5.0],["Ingleborough summit",54.166,-2.398,8.3],["Gaping Gill",54.15,-2.38,11.6],["Clapham",54.118,-2.392,16.6]],"prof":[[0,160],[2.5,260],[3.5,320],[5.0,400],[6.6,600],[8.3,723],[10.0,600],[11.6,400],[13.1,320],[14.1,260],[16.6,160]],"kind":"mountain"},{"id":"bennevis","name":"Ben Nevis","blurb":"Britain’s highest mountain by the Mountain Track from Glen Nevis, up past the Halfway Lochan and the zigzags to the summit plateau, and back down.","pts":[["Glen Nevis Visitor Centre",56.8046,-5.0759,0],["Halfway Lochan",56.81,-5.035,4.3],["Red Burn",56.802,-5.028,5.2],["Ben Nevis summit",56.7969,-5.0036,8.5],["Halfway Lochan",56.81,-5.035,12.7],["Glen Nevis Visitor Centre",56.8046,-5.0759,17.0]],"prof":[[0,20],[1.0,60],[2.0,250],[3.0,400],[4.3,570],[5.2,670],[6.2,900],[7.4,1150],[8.0,1290],[8.5,1345],[9.0,1290],[9.6,1150],[10.8,900],[11.8,670],[12.7,570],[14.0,400],[15.0,250],[16.0,60],[17.0,20]],"kind":"mountain"},{"id":"fairfield","kind":"mountain","name":"Fairfield Horseshoe","blurb":"The great Lakeland round from Ambleside: up over Low Pike and Hart Crag to Fairfield, and back down the far arm over Great Rigg to Rydal.","pts":[["Ambleside",54.432,-2.962,0],["Low Pike",54.46,-2.948,3.8],["Hart Crag",54.48,-2.968,7.0],["Fairfield summit",54.484,-2.986,8.2],["Great Rigg",54.465,-2.993,10.0],["Heron Pike",54.452,-2.992,11.5],["Rydal",54.447,-2.981,14.0],["Ambleside",54.432,-2.962,17.0]],"prof":[[0,60],[1.5,150],[3.8,508],[5.5,650],[7.0,822],[8.2,873],[10.0,766],[11.5,612],[14.0,70],[17.0,60]]},{"id":"benmacdui","kind":"mountain","name":"Ben Macdui","blurb":"Britain’s second-highest mountain from the Cairngorm ski centre, over the high plateau past Cairn Lochan to the summit, and back.","pts":[["Cairngorm car park",57.134,-3.671,0],["Cairn Lochan",57.106,-3.681,4.0],["Lochan Buidhe",57.087,-3.675,6.5],["Ben Macdui summit",57.0703,-3.669,9.0],["Lochan Buidhe",57.087,-3.675,11.5],["Cairn Lochan",57.106,-3.681,14.0],["Cairngorm car park",57.134,-3.671,18.0]],"prof":[[0,637],[1.5,800],[3.0,1100],[4.0,1215],[6.5,1130],[9.0,1309],[11.5,1130],[14.0,1215],[15.0,1100],[16.5,800],[18.0,637]]},{"id":"3peaks","name":"Yorkshire Three Peaks","blurb":"The classic Dales challenge: Pen-y-ghent, Whernside and Ingleborough in one loop from Horton-in-Ribblesdale.","pts":[["Horton-in-Ribblesdale",54.149,-2.293,0.0],["Pen-y-ghent",54.156,-2.249,4.3],["Ribblehead Viaduct",54.21,-2.37,21.2],["Whernside",54.227,-2.402,26.6],["Chapel-le-Dale",54.187,-2.411,30.6],["Ingleborough",54.166,-2.398,33.8],["Horton-in-Ribblesdale",54.149,-2.293,39.4]],"prof":[[0,230],[2.2,350],[4.3,694],[8,420],[14,330],[21.2,300],[24.0,450],[26.6,736],[29,450],[30.6,290],[32.6,550],[33.8,723],[36,500],[39.4,230]],"kind":"mountain"},{"id":"yorkwalls","name":"York City Walls","blurb":"Round the medieval walls of York, from Bootham Bar past Monk Bar and Walmgate Bar to Clifford’s Tower and Micklegate Bar.","pts":[["Bootham Bar",53.962,-1.084,0],["Monk Bar",53.964,-1.078,0.8],["Walmgate Bar",53.956,-1.072,2.0],["Fishergate Bar",53.953,-1.078,2.5],["Clifford’s Tower",53.9555,-1.0805,2.9],["Micklegate Bar",53.955,-1.091,3.6],["Lendal Bridge",53.9595,-1.089,4.2],["Bootham Bar",53.962,-1.084,4.5]],"kind":"walk"},{"id":"kirkstall","name":"Leeds to Kirkstall Abbey","blurb":"Out of the city along the Leeds and Liverpool Canal towpath, past Armley Mills to the great Cistercian ruin at Kirkstall.","pts":[["Granary Wharf",53.793,-1.549,0],["Armley Mills",53.801,-1.581,3.0],["Kirkstall Abbey",53.821,-1.608,6.0]],"kind":"walk"},{"id":"hardcastle","name":"Hardcastle Crags","blurb":"From Hebden Bridge up the wooded valley of Hebden Water to Gibson Mill, and back along the riverside paths.","pts":[["Hebden Bridge",53.7395,-2.012,0],["Midgehole",53.752,-2.017,1.8],["Gibson Mill",53.76,-2.031,3.8],["Midgehole",53.752,-2.017,5.8],["Hebden Bridge",53.7395,-2.012,7.6]],"kind":"walk"},{"id":"oldharry","kind":"walk","name":"Old Harry Rocks","blurb":"The chalk stacks at the start of the Jurassic Coast, from Studland along the cliffs to Old Harry and back over Ballard Down.","pts":[["Studland",50.642,-1.948,0],["Old Harry Rocks",50.6435,-1.9255,2.2],["Ballard Down",50.63,-1.945,4.6],["Ulwell",50.626,-1.967,6.0],["Studland",50.642,-1.948,9.0]]},{"id":"grasmere","kind":"walk","name":"Grasmere and Rydal Water","blurb":"Wordsworth country: from Grasmere along Loughrigg Terrace to Rydal Cave and Rydal Mount, back by the old coffin route past Dove Cottage.","pts":[["Grasmere",54.457,-3.024,0],["Loughrigg Terrace",54.448,-3.013,2.2],["Rydal Cave",54.444,-2.999,3.6],["Rydal Mount",54.452,-2.983,5.2],["White Moss",54.453,-3.001,6.6],["Dove Cottage",54.456,-3.016,8.2],["Grasmere",54.457,-3.024,9.0]]},{"id":"flamborough","name":"Bridlington to Flamborough Head","blurb":"Along the clifftops from Bridlington harbour past Sewerby Hall and Danes Dyke to South Landing and the lighthouse at Flamborough Head.","pts":[["Bridlington",54.082,-0.191,0],["Sewerby Hall",54.102,-0.163,3.0],["Danes Dyke",54.108,-0.144,4.6],["South Landing",54.105,-0.118,6.6],["Flamborough Head",54.116,-0.083,9.5]],"kind":"walk"},{"id":"zennor","name":"St Ives to Zennor","blurb":"The South West Coast Path from St Ives harbour along wild granite cliffs to the village of Zennor and the Tinners Arms.","pts":[["St Ives",50.214,-5.48,0],["Clodgy Point",50.216,-5.4985,1.8],["Pen Enys Point",50.212,-5.53,4.6],["Zennor Head",50.197,-5.57,9.0],["Zennor",50.1915,-5.567,10.0]],"kind":"walk"},{"id":"sycamoregap","kind":"walk","name":"Hadrian’s Wall: Steel Rigg to Housesteads","blurb":"The finest stretch of the Wall, from Steel Rigg past Sycamore Gap and Crag Lough to Housesteads Roman fort, and back.","pts":[["Steel Rigg",54.996,-2.392,0],["Sycamore Gap",55.0,-2.378,1.2],["Crag Lough",55.004,-2.366,2.2],["Housesteads Fort",55.013,-2.331,5.0],["Crag Lough",55.004,-2.366,7.8],["Sycamore Gap",55.0,-2.378,8.8],["Steel Rigg",54.996,-2.392,10.0]],"patch":"Sycamore Gap"},{"id":"saltaire","name":"Saltaire to Five Rise Locks","blurb":"Along the Leeds and Liverpool Canal from Salts Mill in Saltaire to the famous staircase locks at Bingley, and back.","pts":[["Saltaire",53.838,-1.79,0],["Hirst Lock",53.844,-1.798,1.5],["Dowley Gap",53.847,-1.81,2.6],["Bingley Three Rise",53.8505,-1.837,4.4],["Five Rise Locks",53.8555,-1.8415,5.2],["Bingley Three Rise",53.8505,-1.837,6.0],["Dowley Gap",53.847,-1.81,7.8],["Hirst Lock",53.844,-1.798,8.9],["Saltaire",53.838,-1.79,10.4]],"kind":"walk"},{"id":"strid","kind":"walk","name":"Bolton Abbey and the Strid","blurb":"Along the River Wharfe from the priory ruins at Bolton Abbey through Strid Wood to Barden Bridge, and back.","pts":[["Bolton Priory",53.983,-1.888,0],["Cavendish Pavilion",53.991,-1.883,1.7],["The Strid",54.001,-1.893,3.2],["Barden Bridge",54.012,-1.923,5.5],["The Strid",54.001,-1.893,7.8],["Cavendish Pavilion",53.991,-1.883,9.3],["Bolton Priory",53.983,-1.888,11.0]]},{"id":"spurn","name":"Spurn Point","blurb":"Out along the wild sand spit at the mouth of the Humber, past the old lighthouse to the tip at Spurn Point, and back.","pts":[["Spurn Discovery Centre",53.616,0.143,0],["Spurn Lighthouse",53.581,0.111,4.5],["Spurn Point",53.577,0.108,5.5],["Spurn Lighthouse",53.581,0.111,6.5],["Spurn Discovery Centre",53.616,0.143,11.0]],"kind":"walk"},{"id":"whitby","name":"Robin Hood’s Bay to Whitby","blurb":"The Cleveland Way clifftop path from Robin Hood’s Bay past Saltwick Bay to Whitby Abbey and down the 199 steps.","pts":[["Robin Hood’s Bay",54.434,-0.534,0],["Ness Point",54.448,-0.54,1.8],["Maw Wyke Hole",54.465,-0.565,5.0],["Saltwick Bay",54.484,-0.588,8.8],["Whitby Abbey",54.4885,-0.6075,10.6],["Whitby harbour",54.4885,-0.6135,11.2]],"kind":"walk"},{"id":"dunstanburgh","name":"Craster and Dunstanburgh Castle","blurb":"The Northumberland coast from Craster past the ruins of Dunstanburgh Castle and round Embleton Bay to Low Newton, and back.","pts":[["Craster",55.472,-1.592,0],["Dunstanburgh Castle",55.4895,-1.595,2.2],["Embleton Bay",55.5,-1.607,3.6],["Low Newton-by-the-Sea",55.517,-1.617,5.6],["Embleton Bay",55.5,-1.607,7.6],["Dunstanburgh Castle",55.4895,-1.595,9.0],["Craster",55.472,-1.592,11.2]],"kind":"walk"},{"id":"thamespath","name":"Thames Path: Richmond to Hampton Court","blurb":"Riverside London from Richmond Bridge past Ham House and Teddington Lock to Kingston and Hampton Court Palace.","pts":[["Richmond Bridge",51.457,-0.307,0],["Ham House",51.4445,-0.3125,2.0],["Teddington Lock",51.431,-0.322,4.3],["Kingston Bridge",51.412,-0.308,7.3],["Hampton Court Palace",51.4035,-0.3375,12.0]],"kind":"walk","patch":"Richmond to Hampton Court"},{"id":"fountains","name":"Ripon to Fountains Abbey","blurb":"From Ripon Cathedral through Studley Royal deer park to the water gardens and the great ruin of Fountains Abbey, and back.","pts":[["Ripon",54.135,-1.5205,0],["Studley Roger",54.13,-1.5455,2.2],["St Mary’s Church",54.1185,-1.5745,4.5],["Fountains Abbey",54.1095,-1.5815,6.5],["St Mary’s Church",54.1185,-1.5745,8.5],["Studley Roger",54.13,-1.5455,10.8],["Ripon",54.135,-1.5205,13.0]],"kind":"walk"},{"id":"monsal","name":"Monsal Trail","blurb":"The old Midland railway through the Peak District, from Wye Dale through the tunnels and over Monsal Head viaduct to Bakewell.","pts":[["Wye Dale",53.255,-1.815,0],["Chee Dale",53.255,-1.792,2.0],["Miller’s Dale",53.255,-1.76,4.3],["Litton Mill",53.251,-1.747,5.6],["Monsal Head Viaduct",53.24,-1.727,8.0],["Hassop Station",53.224,-1.677,12.0],["Bakewell",53.215,-1.668,13.7]],"kind":"walk"},{"id":"regentscanal","name":"Regent’s Canal","blurb":"London’s towpath from Little Venice past the zoo, Camden Lock, King’s Cross and Victoria Park to Limehouse Basin.","pts":[["Little Venice",51.522,-0.183,0],["London Zoo",51.5355,-0.1535,2.6],["Camden Lock",51.541,-0.146,3.5],["King’s Cross",51.5355,-0.125,5.2],["Angel",51.534,-0.105,6.6],["Victoria Park",51.537,-0.043,10.6],["Mile End",51.525,-0.033,11.9],["Limehouse Basin",51.511,-0.0355,13.8]],"kind":"walk"},{"id":"derwentwater","kind":"walk","name":"Derwentwater Circuit","blurb":"All the way round the Queen of the Lakes from Keswick, past Friar’s Crag, Lodore Falls and Grange, back by the western shore.","pts":[["Keswick",54.5985,-3.1395,0],["Friar’s Crag",54.5925,-3.14,1.0],["Ashness Gate",54.577,-3.135,3.0],["Lodore Falls",54.556,-3.143,5.5],["Grange",54.547,-3.158,7.5],["Brandelhow",54.567,-3.172,10.0],["Hawes End",54.584,-3.169,12.0],["Portinscale",54.5995,-3.158,14.5],["Keswick",54.5985,-3.1395,16.0]]},{"id":"waterofleith","name":"Water of Leith Walkway","blurb":"Edinburgh’s riverside path from Balerno through Currie and Slateford, Dean Village and Stockbridge to the Shore at Leith.","pts":[["Balerno",55.884,-3.338,0],["Currie",55.896,-3.308,3.0],["Juniper Green",55.905,-3.286,5.0],["Slateford",55.9235,-3.249,8.5],["Roseburn",55.9435,-3.237,11.3],["Dean Village",55.9525,-3.2165,13.0],["Stockbridge",55.958,-3.206,14.2],["Leith Shore",55.9755,-3.17,19.6]],"kind":"walk"},{"id":"tissington","name":"Tissington Trail","blurb":"An old railway line from Ashbourne up through Tissington and Hartington to Parsley Hay, with views over Dovedale.","pts":[["Ashbourne",53.023,-1.736,0],["Thorpe",53.048,-1.757,3.2],["Tissington",53.0675,-1.7365,6.6],["Alsop",53.096,-1.759,11.0],["Hartington Station",53.1385,-1.792,17.0],["Parsley Hay",53.17,-1.793,21.0]],"kind":"walk"},{"id":"hornsea","name":"Hornsea Rail Trail","blurb":"The old railway line across Holderness, from the edge of Hull through Sutton and New Ellerby to the seaside at Hornsea.","pts":[["Hull",53.757,-0.324,0],["Sutton-on-Hull",53.778,-0.31,3.5],["New Ellerby",53.831,-0.25,11.0],["Whitedale",53.848,-0.225,14.0],["Hornsea",53.91,-0.168,21.0]],"kind":"walk"},{"id":"cindertrack","name":"The Cinder Track","blurb":"The old coast railway from Scarborough to Whitby, by Cloughton, Ravenscar and Robin Hood’s Bay, over the Larpool Viaduct into Whitby.","pts":[["Scarborough",54.28,-0.405,0],["Scalby",54.299,-0.418,3.5],["Cloughton",54.335,-0.444,8.0],["Ravenscar",54.398,-0.493,17.0],["Robin Hood’s Bay",54.434,-0.534,24.0],["Hawsker",54.457,-0.58,29.0],["Whitby",54.485,-0.615,34.0]],"kind":"walk"},{"id":"marathon","name":"London Marathon","blurb":"The marathon distance on the London course, from Blackheath past the Cutty Sark, over Tower Bridge and round Canary Wharf to the finish on The Mall.","pts":[["Blackheath",51.469,0.003,0],["Woolwich",51.488,0.067,4.8],["Cutty Sark",51.483,-0.01,10.5],["Rotherhithe",51.498,-0.05,16.0],["Tower Bridge",51.5055,-0.0754,20.0],["Limehouse",51.512,-0.039,23.0],["Mudchute",51.491,-0.014,26.5],["Canary Wharf",51.505,-0.019,30.0],["Tower of London",51.508,-0.076,36.0],["Blackfriars",51.511,-0.104,38.6],["Big Ben",51.5007,-0.1246,41.0],["The Mall",51.5045,-0.135,42.2]]},{"id":"dalesway","name":"Dales Way","blurb":"Riverside walking from Ilkley up Wharfedale and over to Dentdale, ending on the shore of Windermere.","pts":[["Ilkley",53.925,-1.822,0.0],["Bolton Abbey",53.983,-1.889,10.5],["Burnsall",54.047,-1.952,19.3],["Grassington",54.071,-1.998,24.1],["Kettlewell",54.146,-2.047,35.4],["Buckden",54.191,-2.091,41.8],["Cam Houses",54.233,-2.268,56.3],["Dent",54.278,-2.454,74.0],["Sedbergh",54.322,-2.528,82.1],["Burneside",54.355,-2.763,109.4],["Staveley",54.376,-2.818,112.7],["Bowness-on-Windermere",54.364,-2.919,127.1]]},{"id":"hadrian","name":"Hadrian’s Wall Path","blurb":"Coast to coast along the Roman wall, from Wallsend on the Tyne past Housesteads fort to Bowness-on-Solway.","pts":[["Wallsend",54.988,-1.534,0.0],["Newcastle Quayside",54.969,-1.606,8.0],["Heddon-on-the-Wall",54.997,-1.795,24.1],["Chollerford",55.033,-2.12,51.5],["Housesteads Fort",55.013,-2.331,67.6],["Steel Rigg",54.996,-2.392,74.0],["Greenhead",54.982,-2.534,85.3],["Birdoswald",54.991,-2.602,91.7],["Carlisle",54.892,-2.932,112.7],["Burgh by Sands",54.921,-3.048,122.3],["Bowness-on-Solway",54.953,-3.212,135.2]]},{"id":"whw","name":"West Highland Way","blurb":"Scotland’s best-loved long walk, from Milngavie along Loch Lomond and across Rannoch Moor to Fort William under Ben Nevis.","pts":[["Milngavie",55.942,-4.314,0],["Drymen",56.064,-4.452,19],["Balmaha",56.085,-4.539,31],["Rowardennan",56.153,-4.642,42],["Inversnaid",56.244,-4.688,54],["Inverarnan",56.328,-4.721,65],["Tyndrum",56.435,-4.711,85],["Bridge of Orchy",56.516,-4.768,95],["Kingshouse",56.645,-4.846,114],["Kinlochleven",56.713,-4.967,128],["Fort William",56.819,-5.105,154]]},{"id":"cotswold","name":"Cotswold Way","blurb":"Honey-stone villages and the Cotswold escarpment, from Chipping Campden through Broadway and Painswick to Bath Abbey.","pts":[["Chipping Campden",52.051,-1.78,0],["Broadway",52.037,-1.859,10],["Winchcombe",51.953,-1.965,30],["Cleeve Hill",51.922,-2.008,40],["Painswick",51.787,-2.195,70],["Wotton-under-Edge",51.638,-2.35,105],["Old Sodbury",51.527,-2.351,125],["Cold Ashton",51.443,-2.371,140],["Bath",51.381,-2.359,164]]},{"id":"leedsliverpool","name":"Leeds and Liverpool Canal","blurb":"Britain’s longest single canal, over the Pennines from Leeds through Saltaire, Skipton and Burnley to Wigan Pier and Liverpool.","pts":[["Leeds",53.794,-1.548,0],["Saltaire",53.838,-1.79,21],["Bingley Five Rise",53.8555,-1.8415,26],["Skipton",53.959,-2.017,47],["Gargrave",53.983,-2.105,54],["Foulridge Tunnel",53.878,-2.163,71],["Burnley",53.789,-2.248,90],["Blackburn",53.748,-2.482,110],["Wigan Pier",53.541,-2.638,150],["Liverpool",53.41,-2.997,204]]},{"id":"c2c","name":"Coast to Coast","blurb":"Wainwright’s walk across northern England, from the Irish Sea to the North Sea through the Lake District, the Dales and the North York Moors.","pts":[["St Bees",54.492,-3.594,0.0],["Ennerdale Bridge",54.524,-3.432,22.5],["Rosthwaite",54.523,-3.147,46.7],["Grasmere",54.459,-3.024,61.2],["Patterdale",54.531,-2.937,74.0],["Shap",54.532,-2.68,99.8],["Orton",54.468,-2.59,112.7],["Kirkby Stephen",54.472,-2.349,132.0],["Keld",54.405,-2.169,152.9],["Reeth",54.388,-1.943,170.6],["Richmond",54.403,-1.737,186.7],["Danby Wiske",54.371,-1.484,209.2],["Ingleby Cross",54.406,-1.309,223.7],["Clay Bank Top",54.423,-1.13,243.0],["Blakey Ridge",54.38,-0.958,257.5],["Glaisdale",54.439,-0.795,272.0],["Grosmont",54.436,-0.725,276.8],["Robin Hood’s Bay",54.434,-0.534,302.6]]},{"id":"pennine","name":"Pennine Way","blurb":"Britain’s first National Trail, up the backbone of England from the Peak District to the Scottish Borders.","pts":[["Edale",53.367,-1.816,0.0],["Crowden",53.491,-1.893,25.7],["Standedge",53.59,-1.958,43.5],["Hebden Bridge",53.742,-2.013,64.4],["Ponden",53.84,-2.023,78.9],["Ickornshaw",53.896,-2.044,91.7],["Gargrave",53.983,-2.105,112.7],["Malham",54.061,-2.15,122.3],["Horton-in-Ribblesdale",54.149,-2.293,144.8],["Hawes",54.304,-2.197,167.4],["Keld",54.405,-2.169,188.3],["Tan Hill",54.457,-2.163,194.7],["Middleton-in-Teesdale",54.626,-2.082,222.1],["Dufton",54.629,-2.488,254.3],["Alston",54.811,-2.438,286.5],["Greenhead",54.982,-2.534,312.2],["Bellingham",55.144,-2.255,347.6],["Byrness",55.314,-2.366,371.8],["Kirk Yetholm",55.547,-2.274,431.3]]},{"id":"lejog","name":"Land’s End to John o’Groats","blurb":"The classic end-to-end, the length of Great Britain by road from Cornwall to Caithness.","pts":[["Land’s End",50.066,-5.714,0.0],["Penzance",50.118,-5.537,16.8],["Truro",50.263,-5.051,62.8],["Bodmin",50.471,-4.718,102.7],["Launceston",50.636,-4.36,140.4],["Okehampton",50.739,-4.004,173.7],["Exeter",50.718,-3.534,213.7],["Taunton",51.015,-3.103,267.7],["Bridgwater",51.128,-3.003,285.1],["Bristol",51.455,-2.588,341.1],["Gloucester",51.864,-2.244,403.0],["Worcester",52.193,-2.221,447.2],["Bridgnorth",52.535,-2.419,495.9],["Shrewsbury",52.708,-2.754,531.7],["Whitchurch",52.969,-2.682,567.2],["Warrington",53.39,-2.597,624.1],["Preston",53.763,-2.703,674.9],["Lancaster",54.047,-2.801,713.7],["Kendal",54.328,-2.746,751.7],["Penrith",54.664,-2.752,796.8],["Carlisle",54.892,-2.932,830.4],["Gretna",54.995,-3.065,847.6],["Moffat",55.333,-3.442,901.4],["Edinburgh",55.953,-3.188,986.8],["Perth",56.396,-3.437,1049.1],["Pitlochry",56.703,-3.734,1095.7],["Aviemore",57.195,-3.825,1162.1],["Inverness",57.478,-4.224,1209.8],["Dingwall",57.596,-4.429,1231.5],["Tain",57.811,-4.055,1270.8],["Helmsdale",58.117,-3.65,1321.0],["Wick",58.438,-3.093,1379.3],["John o’Groats",58.644,-3.07,1407.0]],"patch":"Land's End · John o'Groats"}];
 const WATER = { r: 'M752.5,1002.5L754.3,1003.4L755.9,1004.9L757.1,1007.5L757.6,1010.5L757.7,1014.4L759.8,1019.5L765.6,1023.0L766.8,1023.3L772.6,1022.8L773.9,1022.2L775,1020.4L775.6,1019.9L779,1020.7L784.1,1018.3L789.1,1018.3L792,1016.8L794.3,1017.8L795.1,1017.6L796.2,1016.1L797,1011.6L798.2,1010.0L799.4,1009.2L800.9,1009.2L802,1011.8L803.8,1013.3L804.8,1018.1L806.1,1019.5L805.6,1021.1L801.7,1022.9L802.8,1024.2L804.1,1024.6L806.4,1024.5L807.1,1023.0L807.7,1022.7L808.1,1025.0L812,1027.6L812.4,1031.7L810.7,1036.5L811.5,1039.0L813.7,1041.2L817.7,1042.6L821.2,1045.8L822.7,1045.6L826.4,1043.2L827.7,1041.6L828.6,1039.8L827.9,1037.5L827.7,1035.2L828,1034.9L830.4,1035.9L835,1034.3L835.9,1034.4L837,1033.7L838.6,1033.6L840,1034.0L840.7,1035.1L840.5,1037.3L839.7,1039.8L841.2,1041.3L842.3,1041.5L846,1041.3L847.6,1043.3L848,1045.0L847.8,1046.7L850.7,1048.0L854.7,1052.9L857.6,1052.7L860.9,1050.3L862.5,1051.9L864.1,1051.6L865.1,1049.6L864.3,1047.7L865.1,1046.7L864.2,1044.5L865,1043.6L868.3,1043.3L869.1,1042.3L869.8,1042.0L870.4,1042.4L871.5,1043.9L872.2,1044.2L873.5,1043.9L876.3,1042.0L878.5,1039.6L879.6,1039.3L882.6,1040.9L884.6,1041.3L886.4,1040.3L888.2,1041.6L894.7,1040.0L895.9,1040.7L898.2,1043.2L902.8,1045.1L905.9,1044.3L906.9,1046.3L908.1,1046.6L909.9,1045.8M582.8,411.9L593.5,400.3L604.2,384.5M604.3,384.4L611.6,376.6L611.9,373.3M572.5,427.2L563.8,436.3M582.8,411.9L572.5,427.2M745.2,869.2L743.2,873.8L744,878.9L755.9,894.3L762.2,899.2L773.2,901.1L784.2,888.6L795.8,888.8L803.4,885.2L811.1,877.6L817.1,877.1L833.2,859.6L836.9,837.7L833.2,824.7L837.3,813.2L839.4,796.6M646.5,926.1L649.4,927.2L653.2,932.2L658.2,934.6L661.1,934.3L665.4,926.6L673.2,926.3L676.4,924.3L688.4,901.9L699.5,903.8L704.6,902.3L704.8,904.6L708.7,905.0L714.9,913.7L724.6,913.6L731.6,937.1L737.9,948.1L740.9,965.0L740.5,973.0L745.9,986.0L738.9,995.9L738.7,999.7L737,1002.2L733.9,1002.7L730.5,1009.7M563.8,436.3L554.1,448.6M808.4,989.3L812.9,988.9L819.4,990.8L829.8,977.7L835,974.6L838.4,968.0L843.5,966.2L847.5,960.8L850.6,961.6L852.1,969.7L857,969.5L864,966.5L873.7,947.8L877.6,947.1L882.5,949.2L904.7,921.4L908.5,915.4L909.9,899.4M659.8,601.8L659.1,598.8L663.4,593.2L667.3,583.4L675.3,577.8L680.6,578.0L687.5,581.2L696.2,581.7L701.3,585.2L709.5,582.8L715.1,585.6L722.4,585.1L734.9,578.8L740,578.6L744.9,570.8L749.8,566.7L750.7,563.0L754.3,561.3M713.9,1004.7L713.9,1004.8M713.9,1004.7L711.7,1010.3L712.7,1027.6M665.9,935.6L669.6,940.9L671.1,954.5L670.5,956.6L667.5,955.5L664.8,958.5L663.3,965.2L667.3,968.4L668.7,973.0L675.2,980.1L682.6,975.1L685.2,970.8L705.8,978.6L712.2,979.5L715.5,983.5L713.5,988.5L716.8,993.1L715.7,1003.0L714.6,1001.3L713.9,1004.7M740.6,712.6L741.8,714.8L750.3,719.7L762.9,719.4L770.3,716.2L776.4,717.1L784.1,721.3L790.9,732.0L792.9,740.2L798.4,745.4L799.6,752.3L813.6,766.5L814.4,770.8L812.9,776.9L817.1,785.0L828.6,792.6L830.3,795.4L838.1,795.6M466.3,679.4L466.7,670.2L464.9,662.3M576.5,471.4L589,463.2L598.7,462.7M614,461.3L637.8,458.5L643.3,459.4L648.7,464.7L654.3,474.9L657,477.0L666.2,479.5L661.5,490.4L664.2,496.0L670.2,498.9M464.9,701.3L469,698.9L470.2,691.1L465,683.7L466.3,679.4M598.7,462.7L614,461.3', l: 'M463,685.4L464.2,680.0L465.9,679.1L466.8,679.9L466.9,683.4L470.1,684.6L472.4,684.4L479.2,681.7L480.4,681.9L481.7,683.7L481.4,686.2L478.2,689.5L476.7,694.2L477.3,694.7L479.6,694.4L479.9,697.4L476.8,700.4L475.2,700.6L475.6,702.8L473.9,704.3L475.5,706.5L472.3,708.3L470.5,708.0L468.6,705.8L462.1,706.0L458.2,703.7L457.6,702.6L457.8,701.1L459.9,700.1L463.8,694.0L464.2,691.4L463,685.4ZM604.3,384.4L604.7,386.7L600.8,390.3L593,402.1L590.7,403.4L587.4,408.1L583.1,412.5L582.6,410.9L594.5,398.2L597.9,391.7L599.9,390.5L604.3,384.4ZM568.8,432.1L563.8,436.5L563.5,434.6L566.1,432.5L570.6,426.9L572.5,427.2L568.8,432.1ZM586.1,301.0L579.3,297.0L578.5,295.8L587,299.9L590.1,303.0L591.5,303.1L593.9,305.0L598.9,310.2L598.8,313.1L592,305.8L586.1,301.0ZM540.7,357.7L533.8,353.5L532.2,351.4L529.5,352.0L528.1,351.4L526.1,348.3L526.6,346.4L536.5,353.3L540.7,357.7ZM514.7,454.9L514.7,454.2L518,454.5L532.3,443.3L520.4,454.3L517.3,455.3L514.7,454.9ZM598.7,452.8L597.1,456.6L596.6,454.0L597.2,452.0L604.6,441.0L606.4,439.2L603.1,446.2L598.7,452.8ZM612.4,462.1L602.1,463.0L598.2,462.6L609.3,460.7L612.8,460.4L614,461.2L612.4,462.1ZM557.2,498.4L549,503.0L543.8,512.9L538.6,517.2L536.9,517.5L542.5,512.5L543.7,509.3L548.9,501.6L552.4,499.9L557.8,495.5L559,495.9L557.2,498.4ZM607.3,486.5L607,485.8L608.5,484.9L615.7,481.7L622,474.8L625.6,474.3L625,475.2L621.1,476.6L617.9,481.4L615.4,483.6L607.3,486.5ZM592.9,530.9L592.7,532.1L588.5,534.7L588.4,537.7L587.1,537.0L585.4,533.8L585,526.5L583.2,520.5L581.1,517.0L580.9,505.4L582.5,512.2L582.5,517.1L586.4,524.5L587.7,524.9L592.9,530.9ZM462.9,860.9L464.6,856.5L464.4,855.3L461.4,858.0L460.9,857.5L463.9,853.2L465.3,851.7L466.6,851.7L464.6,852.7L464.5,853.8L467.4,857.1L466.4,859.0L462.9,860.9Z' }; // main rivers and lochs, same projection
 const COAST = { d: 'M480,751L490,761L487,765L474,761L473,772L475,776L481,777L482,801L492,812L489,822L485,822L489,824L489,829L494,831L493,833L489,830L483,835L491,842L490,848L495,861L494,873L498,878L489,894L483,911L484,924L474,939L474,947L467,945L467,943L465,944L471,953L473,949L472,952L477,958L473,965L471,964L472,961L460,965L451,961L445,961L448,956L443,958L444,964L437,971L439,966L433,953L435,965L431,970L426,970L428,966L426,966L426,968L420,970L404,971L396,976L394,974L392,978L397,979L394,986L387,988L386,991L379,990L378,987L376,993L373,995L375,998L367,1001L367,1005L352,1007L357,1001L356,997L341,997L347,1000L345,1004L349,1004L349,1011L340,1019L337,1017L337,1021L336,1018L335,1018L332,1018L336,1019L334,1028L331,1024L319,1024L323,1026L323,1032L313,1030L308,1037L304,1034L295,1034L296,1036L291,1038L289,1042L286,1040L279,1044L283,1037L277,1041L277,1035L275,1034L264,1041L261,1038L258,1044L250,1047L249,1042L268,1028L248,1035L265,1023L274,1020L275,1016L269,1015L267,1011L268,1016L263,1020L247,1023L237,1030L229,1031L229,1028L235,1026L233,1022L238,1021L241,1018L239,1017L240,1015L246,1011L245,1014L247,1013L248,1010L252,1011L251,1009L256,1003L266,999L247,1007L246,1005L230,1014L224,1009L227,1006L223,1002L217,1009L217,1002L213,1002L213,998L222,995L219,990L221,986L236,980L240,975L243,978L245,970L253,971L252,970L254,968L241,969L242,973L239,970L227,973L221,970L219,971L221,973L215,971L216,973L210,974L208,972L209,965L212,963L215,965L215,960L228,953L228,959L232,958L236,955L235,950L238,951L238,957L242,958L247,959L250,956L256,957L247,955L246,952L248,953L248,951L250,950L249,943L242,939L258,931L262,932L259,930L261,921L286,921L300,915L303,916L306,912L319,910L306,908L307,899L302,902L294,916L285,919L282,918L285,914L275,917L266,911L268,914L258,918L258,920L243,923L250,919L263,904L271,901L272,896L280,881L272,880L286,857L293,861L299,860L295,856L303,857L300,854L304,854L307,857L306,854L310,849L300,849L306,847L304,846L307,844L302,843L270,848L267,844L267,841L264,847L263,838L267,836L264,833L268,831L263,831L262,837L261,830L255,839L251,840L245,838L246,834L252,830L250,829L252,827L248,830L248,825L244,826L241,831L235,828L227,828L229,824L235,823L233,820L237,821L238,820L232,819L229,813L225,813L227,812L232,812L231,810L234,810L238,813L240,811L236,807L247,805L250,806L258,807L245,802L245,789L267,785L263,783L267,777L265,777L267,774L254,774L244,778L242,776L245,771L244,767L247,767L252,772L252,768L250,767L245,759L249,750L246,750L244,755L241,754L239,751L245,749L240,742L243,741L238,738L236,744L233,745L234,752L231,752L235,738L231,736L234,732L239,728L240,731L246,732L243,737L240,735L240,737L244,740L249,732L254,734L252,731L254,731L250,729L249,726L278,729L282,727L287,732L289,731L290,738L294,746L295,739L300,730L307,730L313,733L324,732L331,740L335,739L328,734L330,731L338,732L331,728L334,726L325,725L325,722L337,714L338,709L339,713L354,706L350,704L357,693L359,695L360,690L349,695L348,691L338,699L343,695L341,691L338,695L336,692L331,695L324,693L317,689L316,685L327,677L338,678L334,675L342,677L332,671L336,667L347,670L343,667L344,664L348,664L346,662L341,664L339,660L339,657L344,657L338,651L341,651L345,644L347,647L350,633L359,633L358,637L369,626L371,628L368,632L374,630L374,634L377,632L375,635L377,636L379,633L377,627L381,622L380,629L386,632L387,640L389,635L387,627L387,632L381,628L383,622L390,620L399,638L391,645L396,646L389,656L402,646L403,635L397,627L399,619L402,619L402,617L406,619L410,616L412,620L416,619L408,608L419,613L424,619L436,624L436,627L421,635L416,645L429,646L435,629L448,631L466,623L482,628L491,627L495,632L493,643L499,646L498,653L505,658L510,671L516,675L510,668L513,667L517,674L515,681L504,687L502,692L503,695L513,687L525,687L527,689L534,708L531,722L528,725L525,717L527,711L525,703L516,698L516,703L521,705L519,706L521,713L516,723L524,720L526,729L519,737L514,735L506,737L504,751L495,758L491,758L492,756ZM243,769L241,776L235,772L234,766L221,764L226,761L230,762L240,760ZM449,482L439,490L435,488L433,484L449,479ZM468,463L457,476L453,477L452,474L459,467ZM481,431L475,435L468,428L476,422L481,425ZM408,430L403,435L397,434L404,422ZM420,394L416,402L410,401L415,404L416,408L415,412L413,411L410,412L415,412L419,416L410,417L403,402L407,394L405,385L410,383L416,387L413,387L418,390L416,391L407,386ZM409,374L419,377L416,378L419,382L412,383L406,379ZM427,360L419,357L423,363L426,362L423,366L417,367L416,365L412,367L424,368L422,371L417,372L412,371L410,368L412,367L397,362L402,355L408,355L407,358L412,352L411,355L416,356L415,355L421,352L420,355L428,356ZM434,347L424,335L427,338L434,332L438,332L435,329L438,327L443,328L441,326L443,324L425,318L437,311L429,313L431,308L428,310L425,306L425,297L431,296L429,295L429,291L439,293L437,294L442,305L441,296L446,294L450,298L451,296L444,285L451,279L461,276L481,260L486,270L483,276L486,278L474,291L480,293L487,288L487,293L482,297L471,294L473,301L457,307L471,305L474,311L471,312L474,313L470,317L462,315L468,320L464,324L462,323L461,326L456,322L457,326L451,317L454,312L459,311L453,311L448,317L454,330L446,328L445,330L449,336L447,338L442,336L441,342ZM624,840L614,849L608,856L600,859L602,853L598,856L594,854L590,843L590,830L599,826L605,827L609,829L613,840L619,838ZM582,753L575,755L581,738L587,733L594,719L604,716L602,724L606,730L601,738L601,741L587,756ZM557,600L548,602L539,597L536,579L543,571L549,573L552,578L553,585L556,588L554,593L557,594ZM495,575L477,586L477,581L481,577L476,569L481,565L476,564L465,576L465,571L468,565L466,563L468,556L476,552L477,560L478,554L489,546ZM561,570L550,555L549,550L551,548L560,560ZM517,527L505,552L501,555L500,561L493,561L492,549L505,542L498,543L500,536L516,523ZM519,495L514,494L511,499L516,497L516,499L510,504L505,503L505,500L493,507L482,508L480,510L476,509L474,504L476,501L478,501L481,505L481,503L496,497L487,500L484,497L489,490L496,488L497,485L496,484L489,487L486,482L477,480L475,478L478,476L476,472L482,472L487,467L493,468L500,481L510,482L520,490L520,492L517,491ZM452,388L447,378L450,378L450,371L458,379L456,372L461,372L455,367L456,361L467,371L470,371L469,374L471,370L477,377L472,367L474,362L471,362L470,356L477,350L487,363L489,375L485,384L489,383L488,389L491,391L487,394L494,394L492,397L497,396L504,401L512,397L520,399L519,405L511,410L510,415L501,424L497,425L495,421L498,415L507,407L498,409L494,403L496,407L491,414L490,407L487,406L486,408L477,410L479,406L475,407L473,404L475,401L471,401L466,394L470,391L477,395L476,394L471,389L467,390L466,384L463,386L463,382L460,391ZM496,377L497,371L498,373L496,382L498,390L494,392L493,380ZM816,1132L810,1135L810,1140L802,1143L789,1133L784,1134L788,1129L795,1127L801,1122L813,1126ZM935,1054L933,1050L935,1046L943,1050L946,1054L944,1056ZM710,1031L695,1036L693,1034L680,1046L679,1052L656,1052L648,1043L643,1042L637,1027L628,1028L628,1034L625,1035L619,1033L614,1036L608,1034L608,1028L611,1024L612,1027L621,1025L622,1021L606,1021L602,1015L606,1015L603,1014L603,1008L601,1011L598,1010L599,1013L597,1014L585,1015L580,1024L571,1025L566,1030L554,1021L572,1017L570,1011L573,1008L566,1010L568,1011L568,1016L552,1016L550,1020L546,1015L555,1010L554,1001L548,999L542,1000L543,995L554,990L557,982L572,983L572,979L580,972L583,974L583,971L585,970L594,970L606,961L619,944L623,926L630,924L623,925L618,918L623,907L627,903L623,905L617,895L619,892L618,886L621,882L600,886L595,890L593,897L588,894L577,897L588,882L603,870L604,861L606,862L615,849L637,841L634,836L645,842L652,841L670,834L685,848L686,843L679,830L687,825L699,842L706,840L711,834L704,838L696,835L685,812L698,792L692,792L688,788L687,773L700,766L702,761L698,762L696,758L704,748L701,741L703,739L704,735L695,745L691,745L688,738L682,755L676,750L678,733L676,740L671,741L665,731L664,724L650,705L658,682L663,678L666,664L675,662L671,660L673,657L677,656L683,658L690,656L685,656L690,654L659,652L657,654L654,651L654,664L639,667L638,664L636,668L638,671L626,677L623,675L622,670L621,676L619,676L613,670L614,666L609,669L600,661L600,668L604,674L604,684L602,687L594,684L588,676L571,666L565,673L571,692L565,689L565,681L552,664L551,650L555,648L558,659L561,661L563,658L559,648L561,635L570,626L573,614L587,596L582,590L582,584L574,580L567,572L571,567L569,549L575,544L595,548L583,544L576,538L572,531L576,541L571,541L571,532L578,517L571,527L569,520L567,521L569,541L565,540L567,544L564,553L559,552L554,539L556,551L551,547L550,543L546,552L549,558L542,555L540,540L549,526L555,523L559,516L566,512L567,509L558,514L555,520L539,534L538,539L533,537L532,545L541,564L534,571L530,579L532,585L529,597L524,603L528,611L522,617L513,618L511,616L511,607L516,601L518,576L532,557L523,566L519,562L518,557L525,547L518,552L517,549L525,535L521,537L516,546L525,529L527,530L526,525L529,519L523,524L526,514L530,511L524,512L525,503L527,500L533,500L527,500L532,491L548,490L554,483L558,477L549,488L537,489L535,484L532,487L534,480L539,482L546,477L538,481L535,479L543,468L541,466L562,460L551,462L546,460L554,449L518,484L512,480L513,476L511,479L507,478L497,471L497,468L501,467L508,470L506,466L513,462L520,464L527,462L521,463L513,460L504,465L491,462L487,464L483,462L482,459L499,452L507,457L505,452L513,452L507,447L514,446L519,442L514,445L511,444L514,440L502,440L507,439L505,437L508,429L513,425L519,431L525,430L528,428L521,429L518,427L516,423L511,423L512,420L516,415L520,414L526,417L536,417L527,417L518,411L521,404L520,402L524,399L536,403L529,397L533,393L524,397L515,395L520,389L522,390L529,387L533,381L525,388L520,387L522,382L516,388L510,389L509,379L506,378L505,373L508,364L520,371L520,369L529,368L524,366L519,368L510,357L511,351L514,350L517,351L518,349L510,346L509,336L512,332L517,332L519,340L523,343L521,340L524,341L524,336L520,329L522,325L526,326L526,330L530,333L532,333L535,327L548,334L536,326L538,323L557,336L556,331L548,326L549,321L538,314L534,314L533,308L534,306L538,310L542,309L543,302L546,301L540,297L536,288L543,290L553,287L566,292L563,289L567,288L559,288L551,278L553,271L561,274L558,270L556,271L555,268L559,267L562,268L555,261L560,256L563,247L572,250L574,259L576,249L584,255L577,267L587,259L589,253L596,254L599,259L594,267L604,257L611,259L612,256L621,254L625,251L626,254L633,254L652,247L657,250L668,250L668,248L664,244L667,242L669,245L678,243L690,246L683,260L683,263L688,265L683,276L677,283L666,288L658,298L639,311L636,317L627,321L626,324L621,321L627,327L626,332L607,332L601,327L607,334L613,333L624,337L628,335L632,338L640,332L641,333L627,351L625,351L624,346L621,347L616,352L607,353L600,361L599,364L613,353L620,355L626,352L620,364L615,367L610,367L613,368L610,373L614,374L624,366L621,363L637,362L651,355L649,357L653,357L652,354L656,355L659,349L665,348L673,348L689,354L697,350L728,354L737,351L742,353L749,350L756,350L767,360L771,376L757,393L751,409L753,415L744,430L744,438L735,450L728,456L723,474L709,487L687,489L676,499L670,499L676,500L699,489L704,492L702,499L704,501L713,504L718,509L714,514L705,518L693,517L683,526L681,533L669,537L648,534L637,528L649,539L670,540L686,546L695,543L703,533L715,533L719,537L718,539L723,539L736,547L747,549L768,581L770,579L771,583L780,586L787,633L797,655L803,679L809,684L810,690L807,693L811,694L811,690L834,700L849,709L856,721L861,735L867,738L870,744L880,750L874,753L871,760L875,774L894,802L895,806L894,810L892,811L893,805L887,802L879,803L868,792L850,795L844,792L838,796L840,797L845,794L851,798L867,795L873,805L895,821L899,827L907,848L908,857L906,864L895,873L886,886L892,886L901,896L906,896L910,899L916,881L922,877L929,875L948,879L951,878L948,876L967,882L991,899L998,915L1000,931L990,955L987,976L980,979L971,992L967,986L960,982L967,987L967,990L954,990L968,991L963,999L967,1000L968,998L968,1002L961,1008L954,1010L948,1002L942,1013L930,1016L934,1019L945,1013L947,1021L944,1027L947,1028L945,1031L935,1037L927,1037L915,1040L910,1046L920,1042L930,1043L932,1047L922,1050L922,1052L931,1053L932,1050L934,1056L948,1057L956,1055L979,1054L977,1059L974,1060L976,1072L975,1079L962,1087L954,1089L948,1098L948,1105L934,1104L925,1112L909,1116L903,1124L868,1115L859,1118L836,1121L834,1126L827,1122L829,1118L824,1114L819,1114L815,1121L816,1114L810,1114L812,1116L811,1121L790,1105L800,1119L786,1123L784,1128L776,1125L765,1127L760,1131L753,1125L750,1130L753,1128L759,1132L760,1136L758,1141L752,1141L730,1136L726,1140L728,1146L726,1149L725,1142L711,1130L700,1126L674,1132L667,1139L661,1132L663,1140L658,1150L660,1156L655,1159L660,1163L657,1169L654,1168L650,1173L648,1183L640,1184L629,1172L623,1174L619,1170L620,1166L615,1165L614,1161L616,1156L614,1156L612,1163L608,1163L614,1166L612,1166L615,1168L614,1172L605,1166L594,1171L583,1172L582,1169L577,1172L575,1182L565,1185L562,1192L561,1186L558,1186L559,1192L554,1197L557,1198L558,1201L549,1212L542,1199L531,1193L527,1195L525,1201L516,1202L518,1190L529,1183L534,1186L537,1181L541,1179L552,1169L552,1163L559,1160L561,1148L565,1145L566,1150L572,1150L567,1146L567,1142L575,1141L578,1133L589,1121L592,1095L605,1097L613,1088L610,1079L613,1079L612,1075L641,1069L663,1073L666,1076L689,1072L690,1075L690,1060L692,1060L693,1053L711,1039L720,1023L731,1010L725,1014ZM699,224L695,236L690,227L693,226L689,225ZM672,230L667,220L663,220L664,216L669,214L675,217L680,225L675,229L683,227L681,229ZM708,215L702,219L696,216L692,210L683,215L678,215L676,211L676,201L673,204L674,209L670,210L667,204L670,192L676,189L686,191L691,199L683,205L687,207L690,204L693,206L695,204L700,209L705,207L702,211L704,214L704,211L710,209ZM717,198L716,194L711,196L716,191L713,188L716,188L719,190L718,192L721,191L722,195ZM685,185L694,185L693,191L685,190ZM702,186L705,178L707,178L709,181L707,184L708,189L706,190ZM727,174L723,180L722,178L718,181L719,178L717,178L711,184L717,176L716,173L722,172L719,176L729,170L730,174ZM686,169L695,166L692,170L698,172L702,178L699,180L699,177L696,174L693,173L694,176L691,176ZM818,44L813,53L816,50L816,54L809,56L816,59L811,62L815,64L811,67L808,64L808,67L806,68L809,69L808,72L810,69L808,75L810,73L812,78L807,82L810,88L806,90L807,96L804,95L803,111L800,109L801,107L796,105L800,100L798,97L800,97L803,82L803,74L800,74L803,67L799,72L797,67L794,66L798,71L795,71L791,77L786,73L790,70L788,67L786,71L785,69L780,70L776,63L779,60L785,62L789,59L790,63L793,58L797,63L798,56L804,55L798,50L795,51L796,47L792,46L792,40L789,43L789,40L781,41L786,32L791,38L796,37L789,34L794,30L793,27L800,28L801,23L799,40L801,40L796,50L805,45L801,42L803,40L804,43L806,39L811,46L806,49L810,49L811,51ZM818,21L820,26L816,26L820,30L818,33L819,38L814,37L814,40L812,39L809,25L811,22L814,26L814,13L816,14L821,13L821,24ZM823,18L828,0L830,3L828,6L832,0L835,2L836,5L830,14L831,19Z', minx: -885.059, miny: -6773.587, w: 999.6, h: 1217.6, k: 0.580703 };
 const jById = id => JOURNEYS.find(j => j.id === id);
@@ -4955,10 +4987,74 @@ function jProfile(j, km){
     <text x="2" y="${H - 3}" class="ax">${Math.round(p[0][1])} m</text><text x="${W - 2}" y="${H - 3}" class="ax" text-anchor="end">${kmU(len, 1)}</text></svg>`;
 }
 const jXY = (lat, lon) => [lon * 111.32 * COAST.k - COAST.minx, -lat * 111.32 - COAST.miny];
+/* Pausing: a journey counts runs during its active stretches only. settings.journey.spans = [[from, to], ...]
+ * with the last stretch open (to = null) while it's the current journey. Switching away closes the stretch and
+ * keeps the journey in settings.jPaused = { [id]: { start, seen, spans } }; choosing it again picks up from there.
+ * Journeys from before pausing existed have just { start }, which reads as one stretch from start onwards. */
+const jSpans = a => a && a.spans && a.spans.length ? a.spans : a && a.start > 0 ? [[a.start, a.end || null]] : [];
+const inSpans = (t, spans) => spans.some(([s, e]) => t >= s && (e == null || t <= e));
+const jRunsIn = (pid, spans) => (pid === profiles.current ? store.get(KEY, []) : profileRuns(pid)).filter(r => inSpans(r.date, spans)).sort((x, y) => x.date - y.date);
+// distance along a paused journey (for the picker, patches and the journey card)
+function jPausedKm(id, pid = profiles.current){
+  const p = (psOf(pid).jPaused || {})[id], j = jById(id); if (!p || !j) return null;
+  return Math.min(jLen(j), jRunsIn(pid, jSpans(p)).reduce((s, r) => s + r.dist, 0) / 1000);
+}
+// make id the current journey: pause the one you're leaving (unless finished), resume id if it was paused
+function setJourney(id){
+  const now = Date.now(), cur = settings.journey, curSt = jState(), paused = Object.assign({}, settings.jPaused);
+  if (cur && cur.id !== id && curSt && !curSt.done && curSt.km > 0){
+    paused[cur.id] = { start: cur.start, seen: cur.seen || 0, spans: jSpans(cur).map(([s, e]) => [s, e == null ? now : e]) };
+  }
+  let resumed = false;
+  if (cur && cur.id === id && curSt && !curSt.done) return false;           // already on it
+  if (paused[id]){ const p = paused[id]; settings.journey = { id, start: p.start, seen: p.seen || 0, spans: p.spans.concat([[now, null]]) }; delete paused[id]; resumed = true; }
+  else settings.journey = { id, start: now, seen: 0, spans: [[now, null]] };
+  settings.jPaused = paused; saveSettings();
+  return resumed;
+}
+// pause the current journey without picking another
+function pauseJourney(){
+  const cur = settings.journey, st = jState(); if (!cur || !st) return;
+  if (!st.done && st.km > 0){ const now = Date.now();
+    settings.jPaused = Object.assign({}, settings.jPaused, { [cur.id]: { start: cur.start, seen: cur.seen || 0, spans: jSpans(cur).map(([s, e]) => [s, e == null ? now : e]) } }); }
+  delete settings.journey; saveSettings();
+}
+/* One journey at a time: while you're in a household race you haven't finished, your solo journey is paused,
+ * from the moment the race started for you, so a run counts for the race or the solo journey, never both.
+ * It picks up again by itself when the race ends for you: you finish, the race is called off, or you clear it. */
+function myRaceStart(c){ return c.owner === profiles.current ? c.start : Math.max(c.start, (c.replies[profiles.current] || {}).at || c.start); }
+let enforcing = false;
+function enforceOneJourney(){
+  if (enforcing) return; enforcing = true;
+  try {
+    const race = activeRace(), cur = settings.journey;
+    if (race && cur){
+      const st = jState();
+      if (st && !st.done){
+        const at = myRaceStart(race), spans = jSpans(cur).map(([s, e]) => [s, e == null ? Math.max(s, at) : Math.min(e, Math.max(s, at))]);
+        const km = jRunsIn(profiles.current, spans).reduce((a, r) => a + r.dist, 0) / 1000;
+        if (km > 0) settings.jPaused = Object.assign({}, settings.jPaused, { [cur.id]: { start: cur.start, seen: cur.seen || 0, spans } });
+        settings.jResumeAfter = km > 0 ? cur.id : null;
+        delete settings.journey; saveSettings();
+        toast(`${st.j.name} is paused while you race ${race.jo.name}. It carries on when the race ends.`);
+      } else if (st && st.done){ delete settings.journey; saveSettings(); }
+    } else if (!race && !cur && settings.jResumeAfter){
+      const id = settings.jResumeAfter; settings.jResumeAfter = null; saveSettings();
+      if (jById(id) && (settings.jPaused || {})[id]){ setJourney(id); toast(`Race over, so ${jById(id).name} carries on from where you left it.`); }
+    }
+  } finally { enforcing = false; }
+}
+const racingBlock = () => { const r = activeRace(); if (!r) return false;
+  toast(`You’re racing ${r.jo.name}. Solo journeys stay paused until the race ends.`); return true; };
+function forgetPaused(id){ const p = Object.assign({}, settings.jPaused); delete p[id]; settings.jPaused = p; saveSettings(); }
+const journeyGo = (id) => { if (racingBlock()) return; const nj = jById(id), back = setJourney(id), km = back ? jState().km : 0;
+  renderWorkouts(); renderTerrain(); if (typeof renderPatches === 'function') renderPatches();
+  toast(back ? `Back on ${nj.name}, carrying on from ${kmU(km)}` + (nj.prof && settings.terrain && hillWarn() ? ` ⚠️ ${hillWarn(true)}` : '')
+    : `${nj.name}: off you go!` + (nj.prof && settings.terrain && hillWarn() ? ` ⚠️ ${hillWarn(true)}` : '')); };
 function jState(pid = profiles.current){
   const ps = pid === profiles.current ? settings : rawGet(SKEY, pid, {}), a = ps.journey, j = a && jById(a.id);
-  if (!j || !(a.start > 0)) return null;
-  const runs = (pid === profiles.current ? store.get(KEY, []) : profileRuns(pid)).filter(r => r.date >= a.start).sort((x, y) => x.date - y.date);
+  if (!j || !jSpans(a).length) return null;
+  const runs = jRunsIn(pid, jSpans(a));
   const km = runs.reduce((s, r) => s + r.dist, 0) / 1000, len = jLen(j);
   // when each milestone was passed, from the runs in order
   const reached = [], tot = { v: 0 };
@@ -5063,13 +5159,16 @@ const initial = n => (String(n || '?').trim()[0] || '?').toUpperCase();
 const kmU = (km, dp = 1) => `${fD(km * 1000, dp)} ${dU()}`;
 function renderJourney(){
   const box = $('#jrBox'); if (!box) return;
+  enforceOneJourney();
   const st = jState();
   const inv = profiles.list.length > 1 ? chAll().filter(c => c.status === 'pending' && c.to.includes(profiles.current) && !c.replies[profiles.current]).length : 0;
-  $('#jrCount').textContent = inv ? `🏁 ${inv} challenge invite${inv === 1 ? '' : 's'}` : st ? (st.done ? `${st.j.name}, done` : `${st.j.name}, ${Math.floor(st.km / st.len * 100)}%`) : 'Not started';
+  const racing = activeRace();
+  $('#jrCount').textContent = inv && !racing ? `🏁 ${inv} challenge invite${inv === 1 ? '' : 's'}` : racing ? `🤝 Racing ${racing.jo.name}` : st ? (st.done ? `${st.j.name}, done` : `${st.j.name}, ${Math.floor(st.km / st.len * 100)}%`) : Object.keys(settings.jPaused || {}).length ? `⏸ ${Object.keys(settings.jPaused).length} paused` : 'Not started';
   if (!st){
     const doneN = (settings.journeysDone || []).length;
     box.innerHTML = `<p class="muted">Run along a real route. Every run moves you further, with a celebration at each town you pass.${doneN ? ` You’ve finished ${doneN} journey${doneN === 1 ? '' : 's'} so far.` : ''}</p>
-      <div class="row"><button class="sm primary" data-jr="pick">Choose a journey</button></div>${chHtml()}`;
+      ${activeRace() ? `<div class="jwarn"><p>🤝 You’re racing <strong>${esc(activeRace().jo.name)}</strong>, so solo journeys are paused until the race ends. Your runs count for the race.</p></div>`
+        : `<div class="row"><button class="sm primary" data-jr="pick">Choose a journey</button></div>`}${pausedHtml()}${chHtml()}`;
     return;
   }
   const others = profiles.list.filter(p => p.id !== profiles.current).map(p => { const o = jState(p.id); return o && o.j.id === st.j.id ? { p, km: o.km } : null; }).filter(Boolean);
@@ -5084,14 +5183,16 @@ function renderJourney(){
     ${st.j.prof ? `<div class="jterr">${jProfile(st.j, st.km)}
       ${(() => { const top = jNextTop(st.j, st.km); return !st.done && top ? `<p class="muted">⛰ ${Math.max(0, Math.round(top.ele - jEle(st.j, st.km)))} m of climbing to the next top, ${kmU(top.km - st.km)} away.</p>` : ''; })()}
       <label class="check"><input type="checkbox" id="jTerrain"${settings.terrain ? ' checked' : ''}><span>Move the treadmill incline to follow the hills</span></label>
+      ${settings.terrain && hillWarn() ? `<p class="jwarn">⚠️ ${hillWarn()}</p>` : ''}${clashHtml()}
       <label class="f jmax"><span>Steepest incline</span><select id="jTerrainMax">${[4, 6, 8, 10, 12, 15].map(v => `<option value="${v}"${(settings.terrainMax || 8) === v ? ' selected' : ''}>${v}%</option>`).join('')}</select></label>
-      <p class="fhint">Steeper stretches are held at this. Downhills run flat. Needs Treadmill control on in Settings; a workout’s own inclines take priority, and if you change the incline yourself it stays until the next stretch. Heights are approximate.</p>
+      <p class="fhint">Steeper stretches are held at this. Downhills run flat. Works on free runs with Treadmill control on in Settings; workouts set their own incline. If you change the incline yourself it stays until the next stretch. Heights are approximate.</p>
     </div>` : ''}
     ${others.length ? `<p class="muted jothers">${others.map(o => `${esc(o.p.name)}: ${kmU(o.km)}`).join(', ')}</p>` : ''}
     <details class="sect" data-sect="jstops"${sectOpen('jstops', false) ? ' open' : ''}><summary>Stops<span class="count">${st.passed}/${st.j.pts.length - 1}</span></summary><div class="sbody"><ol class="jstops">
       ${st.j.pts.map((p, i) => `<li class="${i <= st.passed ? 'on' : ''}"><span>${esc(p[0])}</span><span class="muted">${i <= st.passed ? (i ? fmtDate(st.reached[i]) : 'Start') : kmU(p[3], 0)}</span></li>`).join('')}
     </ol></div></details>
-    <div class="row">${st.done ? '<button class="sm primary" data-jr="pick">Start another journey</button>' : '<button class="sm" data-jr="pick">Change journey</button>'}<button class="sm danger" data-jr="stop">${st.done ? 'Clear' : 'Stop journey'}</button></div>
+    <div class="row">${st.done ? '<button class="sm primary" data-jr="pick">Start another journey</button>' : '<button class="sm" data-jr="pick">Change journey</button>'}<button class="sm${st.done ? ' danger' : ''}" data-jr="stop">${st.done ? 'Clear' : '⏸ Pause journey'}</button></div>
+    ${pausedHtml()}
     ${chHtml()}
     <p class="fhint jcredit">Distances are approximate. ${mapStyle(st.j) ? TILES[mapStyle(st.j)].credit + '.' : `Map outline from Natural Earth.${settings.mapStyle !== 'drawn' ? ' The full map shows when you’re online.' : ''}`}</p>`;
 }
@@ -5101,17 +5202,23 @@ function openJourneys(){
   const sort = settings.jSort || 'type';
   const list = sort === 'type' ? JOURNEYS : JOURNEYS.slice().sort((a, b) => sort === 'short' ? jLen(a) - jLen(b) : jLen(b) - jLen(a));
   d.innerHTML = `<h3>Choose a journey</h3>
-    <p class="muted">Distance you run from today counts towards it.${cur && !cur.done ? ' Switching restarts from the beginning.' : ''}</p>
+    ${activeRace() ? `<div class="jwarn"><p>🤝 You’re racing ${esc(activeRace().jo.name)}. You can do one journey at a time, so solo journeys can start once the race ends.</p></div>` : ''}
+    <p class="muted">Distance you run from today counts towards it.${cur && !cur.done ? ` Switching pauses ${esc(cur.j.name)}, so you can pick it up again later.` : ''}</p>
     <div class="seg jsort" role="group" aria-label="Sort journeys">${[['type', 'By type'], ['short', 'Shortest first'], ['long', 'Longest first']].map(([v, l]) => `<button data-jsort="${v}" aria-pressed="${sort === v}">${l}</button>`).join('')}</div>
-    ${list.map((j, i) => `${sort === 'type' && (i === 0 || (list[i - 1].kind || 'route') !== (j.kind || 'route')) ? `<h4 class="jgrp">${JKIND[j.kind || 'route']}</h4>` : ''}<div class="pcard"><strong>${esc(j.name)}</strong>${sort !== 'type' && j.prof ? ' <span class="jhill">⛰ hills</span>' : ''}<span class="muted">, ${kmU(jLen(j), jLen(j) < 20 ? 1 : 0)}${j.pts[0][0] === j.pts[j.pts.length - 1][0] ? (j.kind ? ' round trip' : ' loop') : ''}${j.prof ? `, ${Math.round(jAscent(j)).toLocaleString('en-GB')} m of climbing` : `, ${j.pts.length - 2} stops on the way`}</span><p>${esc(j.blurb)}</p>
-      <button class="sm${cur && cur.j.id === j.id && !cur.done ? '' : ' primary'}" data-jstart="${j.id}"${cur && cur.j.id === j.id && !cur.done ? ' disabled' : ''}>${cur && cur.j.id === j.id && !cur.done ? 'Your current journey' : 'Start this journey'}</button></div>`).join('')}
+    ${list.map((j, i) => `${sort === 'type' && (i === 0 || (list[i - 1].kind || 'route') !== (j.kind || 'route')) ? `<h4 class="jgrp">${JKIND[j.kind || 'route']}</h4>` : ''}<div class="pcard"><strong>${esc(j.name)}</strong>${sort !== 'type' && j.prof ? ' <span class="jhill">⛰ hills</span>' : ''}<span class="muted">, ${kmU(jLen(j), jLen(j) < 20 ? 1 : 0)}${j.pts[0][0] === j.pts[j.pts.length - 1][0] ? (j.kind ? ' round trip' : ' loop') : ''}${j.prof ? `, ${Math.round(jAscent(j)).toLocaleString('en-GB')} m of climbing` : `, ${j.pts.length - 2} stop${j.pts.length === 3 ? '' : 's'} on the way`}</span><p>${esc(j.blurb)}</p>
+      ${(() => { const isCur = cur && cur.j.id === j.id && !cur.done, pk = isCur ? null : jPausedKm(j.id);
+      if (isCur) return `<button class="sm" disabled>Your current journey</button>`;
+      if (pk != null) return `<p class="jpaused">⏸ Paused at ${kmU(pk)} of ${kmU(jLen(j), jLen(j) < 20 ? 1 : 0)}${(() => { const pi = j.pts.filter(p => pk >= p[3]).length - 1; return pi > 0 ? `, past ${esc(j.pts[pi][0])}` : ''; })()}</p>
+        <div class="row"><button class="sm primary" data-jstart="${j.id}">Resume</button><button class="sm" data-jrestart="${j.id}">Start again</button></div>`;
+      return `<button class="sm primary" data-jstart="${j.id}">Start this journey</button>`; })()}</div>`).join('')}
     <div class="drow"><span></span><button id="jrClose">Close</button></div>`;
   d.querySelector('#jrClose').onclick = () => d.close();
   d.querySelectorAll('[data-jsort]').forEach(b => b.onclick = () => { settings.jSort = b.dataset.jsort; saveSettings(); openJourneys(); d.scrollTop = 0; });
-  d.querySelectorAll('[data-jstart]').forEach(b => b.onclick = () => {
-    if (cur && !cur.done && cur.km > 0 && !confirm(`Leave ${cur.j.name}? Your ${kmU(cur.km)} on it won’t carry over.`)) return;
-    settings.journey = { id: b.dataset.jstart, start: Date.now(), seen: 0 }; saveSettings();
-    d.close(); renderJourney(); toast(`${jById(b.dataset.jstart).name}: off you go!`);
+  d.querySelectorAll('[data-jstart]').forEach(b => b.onclick = () => { d.close(); journeyGo(b.dataset.jstart); });
+  d.querySelectorAll('[data-jrestart]').forEach(b => b.onclick = () => {
+    const j = jById(b.dataset.jrestart), pk = jPausedKm(j.id);
+    if (!confirm(`Start ${j.name} again from the beginning? Your paused ${kmU(pk)} on it will be cleared.`)) return;
+    forgetPaused(j.id); d.close(); journeyGo(j.id);
   });
   if (!d.open) d.showModal();
 }
@@ -5206,13 +5313,13 @@ function chHtml(){
       <div class="row">${c.status === 'pending' ? `<button class="sm" data-chcancel="${c.id}">Cancel invite</button>` : `<button class="sm" data-chhide="${c.id}">Clear</button>`}</div></div>`);
   });
   return `<h4 class="jgrp">Household challenges</h4>${parts.join('') || '<p class="muted">Race someone in your household along any journey. Your runs count for your own journey and the race at the same time.</p>'}
-    <div class="row"><button class="sm" data-chnew>🤝 Challenge someone</button></div>`;
+    ${activeRace() ? '' : '<div class="row"><button class="sm" data-chnew>🤝 Challenge someone</button></div>'}`;
 }
 function openChallenge(){
   const d = $('#jrDlg'), others = profiles.list.filter(p => p.id !== profiles.current);
   const list = JOURNEYS.slice().sort((a, b) => jLen(a) - jLen(b));
   d.innerHTML = `<h3>Challenge someone</h3>
-    <p class="muted">Pick a journey and who to race. When they accept, the race starts and the first to the end wins.</p>
+    <p class="muted">Pick a journey and who to race. When they accept, the race starts and the first to the end wins.${jState() && !jState().done ? ` You can do one journey at a time, so ${esc(jState().j.name)} pauses while you race and carries on afterwards.` : ''}</p>
     <h4>Who</h4><div class="chwho">${others.map(p => `<label class="check"><input type="checkbox" value="${esc(p.id)}"${others.length === 1 ? ' checked' : ''}><span>${esc(p.name)}</span></label>`).join('')}</div>
     <h4>Journey</h4><label class="f"><span>Race along</span><select id="chJ">${list.map(j => `<option value="${j.id}">${esc(j.name)}, ${kmU(jLen(j), jLen(j) < 20 ? 1 : 0)}${j.prof ? ' ⛰' : ''}</option>`).join('')}</select></label>
     <p class="err" id="chErr"></p>
@@ -5231,8 +5338,13 @@ function openChallenge(){
 function chAct(e){
   const t = e.target.closest('[data-chok],[data-chno],[data-chcancel],[data-chhide],[data-chnew]'); if (!t) return false;
   const reply = ok => { settings.chReplies = Object.assign({}, settings.chReplies, { [t.dataset.chok || t.dataset.chno]: { ok, at: Date.now() } }); saveSettings(); };
-  if (t.dataset.chnew != null) openChallenge();
-  else if (t.dataset.chok){ reply(true); toast('Challenge accepted. Your runs from now on count, good luck!'); if (settings.confetti) confetti(2); }
+  if (t.dataset.chnew != null){ if (activeRace()){ toast(`Finish your ${activeRace().jo.name} race first. You can race one challenge at a time.`); return true; } openChallenge(); }
+  else if (t.dataset.chok){
+    if (activeRace()){ toast(`Finish your ${activeRace().jo.name} race first. You can race one challenge at a time.`); return true; }
+    const st = jState();
+    if (st && !st.done && st.km > 0 && !confirm(`Accepting pauses ${st.j.name} at ${kmU(st.km)} until the race ends. You can do one journey at a time. Accept?`)) return true;
+    reply(true); renderJourney(); toast('Challenge accepted. Your runs from now on count for the race, good luck!'); if (settings.confetti) confetti(2);
+  }
   else if (t.dataset.chno){ reply(false); toast('Challenge declined'); }
   else if (t.dataset.chcancel){
     if (!confirm('Call off this challenge?')) return true;
@@ -5252,6 +5364,7 @@ function chCheck(){
       showBadgeText(place === 1 ? `🏆 You won the ${c.jo.name} challenge!` : `🏁 ${c.jo.name} challenge: you came ${place === 2 ? '2nd' : place === 3 ? '3rd' : place + 'th'}`);
       if (settings.confetti) confetti(place === 1 ? 10 : 3);
       setTimeout(checkNewBadges, 2200);
+      setTimeout(() => { enforceOneJourney(); renderJourney(); }, 4500);   // race over: the paused solo journey carries on
     } else if (s.winner && !(settings.chLost || {})[c.id]){
       settings.chLost = Object.assign({}, settings.chLost, { [c.id]: true }); saveSettings();
       toast(`🏆 ${s.winner.name} has won the ${c.jo.name} challenge. You can still finish it.`);
@@ -5268,12 +5381,20 @@ function chNotify(){
 }
 
 // after a run: celebrate each town passed (once), and finishing the journey
+// paused journeys, on the journey card, with a Resume button each
+function pausedHtml(){
+  const ids = Object.keys(settings.jPaused || {}).filter(id => jById(id) && jPausedKm(id) != null); if (!ids.length) return '';
+  return `<h4 class="jgrp">Paused journeys</h4>${ids.map(id => { const j = jById(id), km = jPausedKm(id), pi = j.pts.filter(p => km >= p[3]).length - 1;
+    return `<div class="chcard jpcard"><div class="jhead"><strong>⏸ ${esc(j.name)}</strong><span class="muted">${kmU(km)} of ${kmU(jLen(j), jLen(j) < 20 ? 1 : 0)}</span></div>
+      <div class="prog jprog"><i style="width:${(km / jLen(j) * 100).toFixed(1)}%"></i></div>
+      <div class="row"><span class="muted">${pi > 0 ? `Past ${esc(j.pts[pi][0])}` : `From ${esc(j.pts[0][0])}`}</span><button class="sm" data-jr="resume" data-id="${id}">Resume</button></div></div>`; }).join('')}`;
+}
 function journeyCheck(){
   const st = jState(); if (!st || st.passed <= (st.a.seen || 0)) return;
   const town = st.j.pts[st.passed][0];
   settings.journey.seen = st.passed;
   if (st.done){
-    settings.journeysDone = (settings.journeysDone || []).concat({ id: st.j.id, start: st.a.start, end: Date.now() });
+    settings.journeysDone = (settings.journeysDone || []).concat({ id: st.j.id, start: st.a.start, end: Date.now(), spans: jSpans(st.a).map(([s, e]) => [s, e == null ? Date.now() : e]) });
     showBadgeText(`🏁 ${st.j.name} complete!`); toast(`🏁 You’ve finished ${st.j.name}!`);
     setTimeout(checkNewBadges, 2200);   // its journey badge (and any collection badge) unlocks now
   } else {
@@ -5293,15 +5414,16 @@ function jClimb(j, a, b){
 function jRunMap(pid = profiles.current){
   const ps = pid === profiles.current ? settings : rawGet(SKEY, pid, {});
   const runs = (pid === profiles.current ? store.get(KEY, []) : profileRuns(pid)).slice().sort((x, y) => x.date - y.date);
-  const done = ps.journeysDone || [], spans = done.map(x => ({ id: x.id, start: x.start, end: x.end }));
+  const done = ps.journeysDone || [], spans = done.map(x => ({ id: x.id, ranges: jSpans(x) }));
   const cur = ps.journey;
-  if (cur && cur.start > 0 && !done.some(x => x.id === cur.id && x.start === cur.start)) spans.push({ id: cur.id, start: cur.start, end: Infinity });
+  if (cur && jSpans(cur).length && !done.some(x => x.id === cur.id && x.start === cur.start)) spans.push({ id: cur.id, ranges: jSpans(cur) });
+  Object.entries(ps.jPaused || {}).forEach(([id, p]) => spans.push({ id, ranges: jSpans(p) }));
   const out = new Map();
   spans.forEach(sp => {
     const j = jById(sp.id); if (!j) return;
     const len = jLen(j); let km = 0;
     runs.forEach(r => {
-      if (r.date < sp.start || r.date > sp.end || km >= len) return;
+      if (!inSpans(r.date, sp.ranges) || km >= len) return;
       const a = km, b = Math.min(len, km + r.dist / 1000); km = b;
       out.set(r.id, { j, from: a, to: b, km: b - a, towns: j.pts.filter((p, i) => i && p[3] > a && p[3] <= b).map(p => p[0]), climb: jClimb(j, a, b), finished: b >= len && a < len });
     });
@@ -5334,9 +5456,41 @@ function jReportLine(from, to){
 }
 
 /* ---------- terrain: the treadmill incline follows the journey's hills ---------- */
+/* Hill and mountain walks only move the incline on free runs: a workout or plan session sets its own incline.
+ * When a hill walk with automatic incline meets a workout, the app says so and suggests a journey without
+ * hills of a similar length instead (not yet finished if possible), with a button to switch. */
+const workoutOn = () => run ? !!wo : !!getWorkout(selected);
+function hillClash(){ const st = journeyNow(); return st && !st.done && st.j.prof && settings.terrain && workoutOn() ? st : null; }
+function flatAlt(j){
+  const done = patchDone(), cur = jState();
+  return JOURNEYS.filter(x => !x.prof && !(cur && cur.j.id === x.id))
+    .sort((a, b) => (!!done[a.id] - !!done[b.id]) || Math.abs(jLen(a) - jLen(j)) - Math.abs(jLen(b) - jLen(j)))[0] || null;
+}
+function clashHtml(){
+  const st = hillClash(); if (!st) return '';
+  const w = run ? wo && wo.def : getWorkout(selected), alt = st.race ? null : flatAlt(st.j);   // no switching mid-race
+  return `<div class="jwarn"><p>⚠️ Hill and mountain walks only move the incline on <strong>free runs</strong>. ${w ? esc(w.name) : 'Your workout'} sets its own incline, so the hills on ${esc(st.j.name)} won’t move the treadmill. Your distance still counts towards it.</p>
+    ${alt ? `<p>For workouts, a journey without hills suits better, such as <strong>${esc(alt.name)}</strong> (${kmU(jLen(alt), jLen(alt) < 20 ? 1 : 0)}).</p><div class="row"><button class="sm" data-jalt="${alt.id}">Switch to ${esc(alt.name)}</button></div>` : ''}</div>`;
+}
+function switchJourney(id){ if (jById(id)) journeyGo(id); }   // pauses the hill walk, so you can come back to it for free runs
+document.addEventListener('click', e => { const b = e.target.closest('[data-jalt]'); if (b){ e.stopPropagation(); switchJourney(b.dataset.jalt); } }, true);
+// which treadmill: the one connected now, else the one last used on this phone (pitpat | incline | flat | null)
+const LASTTM = 'tm-lasttm-v1';
+function treadKind(){ if (pp) return 'pitpat'; if (ch) return ctrl.incline ? 'incline' : 'flat'; return store.get(LASTTM, null); }
+// automatic incline needs a treadmill that tilts: the adidas does, the PitPat walking pad doesn't
+function hillWarn(short = false){
+  const k = treadKind();
+  if (k === 'pitpat') return short ? 'Automatic incline only works on the adidas treadmill, not the PitPat walking pad.'
+    : 'Automatic incline only works on the adidas treadmill. The PitPat walking pad has no incline, so the hills won’t move it. You’ll still travel the walk and see the height profile.';
+  if (k === 'flat') return short ? 'This treadmill can’t have its incline set by the app. Automatic incline works on the adidas treadmill.'
+    : 'This treadmill doesn’t let the app set its incline, so the hills won’t move it. Automatic incline works on the adidas treadmill.';
+  return '';
+}
 const terr = { sent: null, at: 0, seg: -1, held: -1 };
+// the journey you're on right now: your race if you're racing, otherwise your solo journey
+function journeyNow(){ const r = activeRace(); if (r){ const rs = chRaceState(r); return rs && { j: rs.j, km: rs.km, len: rs.len, done: rs.done, race: r }; } return jState(); }
 function terrainNow(){
-  const st = jState(); if (!st || !st.j.prof || st.done || !run || run.demo && !isDemo) return null;
+  const st = journeyNow(); if (!st || !st.j.prof || st.done || !run || run.demo && !isDemo) return null;
   const km = Math.min(st.len, st.km + run.dist / 1000), p = st.j.prof;
   let seg = p.length - 1; for (let i = 1; i < p.length; i++) if (km + .02 <= p[i][0]){ seg = i; break; }
   const grade = jGrade(st.j, km), max = settings.terrainMax || 8;
@@ -5346,6 +5500,8 @@ function terrainNow(){
 }
 function terrainTick(){
   const t = terrainNow(); renderTerrain(t);
+  if (t && settings.terrain && !terr.warned && hillWarn()){ terr.warned = true; toast('⚠️ ' + hillWarn(true)); }
+  else if (t && settings.terrain && wo && !terr.warned){ terr.warned = true; toast('⚠️ Hill walks only move the incline on free runs. This workout sets its own.'); }
   if (!t || !settings.terrain || wo || !controlAvailable() || !(isDemo || ctrl.incline) || live.speed <= MOVING) return;
   if (terr.held === t.seg) return;                 // you changed the incline yourself on this stretch
   if (t.seg !== terr.seg){ terr.seg = t.seg; terr.held = -1; }
@@ -5361,10 +5517,192 @@ function renderTerrain(t = terrainNow()){
   const show = !!t && !!settings.terrain;
   if (el.hidden !== !show) el.hidden = !show;
   if (!show) return;
-  const off = !controlAvailable() ? 'Treadmill control is off, so set the incline yourself.' : wo ? 'Paused while your workout sets the incline.' : terr.held === t.seg ? 'You’ve set the incline yourself; it follows the hills again from the next stretch.' : '';
+  const off = hillWarn() ? hillWarn() : !controlAvailable() ? 'Treadmill control is off, so set the incline yourself.' : wo ? 'Paused while your workout sets the incline.' : terr.held === t.seg ? 'You’ve set the incline yourself; it follows the hills again from the next stretch.' : '';
   el.innerHTML = `<div class="step-head"><span>⛰ ${esc(t.st.j.name)}</span><span>${Math.round(jEle(t.st.j, t.km))} m</span></div>
     <p class="terrline">${t.grade > .25 ? `Climbing at ${t.grade.toFixed(0)}%` : t.grade < -.25 ? `Downhill at ${Math.abs(t.grade).toFixed(0)}%` : 'Flat'}${off ? '' : `, treadmill ${t.target}%${t.capped ? ' (your steepest)' : ''}`}</p>
-    ${off ? `<p class="hint">${off}</p>` : ''}${jProfile(t.st.j, t.km)}`;
+    ${wo && !hillWarn() ? clashHtml() : off ? `<p class="hint">${off}</p>` : ''}${jProfile(t.st.j, t.km)}`;
+}
+
+/* ---------- journey patches ----------
+ * An embroidered cloth patch for every journey, stitched when you finish it. Separate from badges (no
+ * celebrations), shown on their own tab under Profile. Each patch is drawn as SVG: twill fabric, a satin-stitched
+ * scene, an overlocked edge and the name stitched round the rim. PATCH = { journey id: [scene, palette, rim] }. */
+const PAL = {
+  dawn:   { sky: '#f6c28b', sun: '#fff1c1', far: '#b98fb0', mid: '#8e6f9e', near: '#5b4b78', ground: '#4e7a45', water: '#6fa3c7', band: '#1f3b5c', ink: '#f8f1e0', rim: '#1f3b5c' },
+  day:    { sky: '#9fd3ea', sun: '#ffe36e', far: '#8fb3a0', mid: '#5f9471', near: '#3f7350', ground: '#5f9e48', water: '#3f86c2', band: '#245b2e', ink: '#fff7e6', rim: '#173f20' },
+  dusk:   { sky: '#f08a5d', sun: '#ffd36b', far: '#b0506a', mid: '#6b3a5e', near: '#3b2a4f', ground: '#2f4a3a', water: '#3d5a80', band: '#3b2a4f', ink: '#ffe9c7', rim: '#2a1d38' },
+  snow:   { sky: '#bfe2f2', sun: '#ffffff', far: '#9cb6c9', mid: '#6f8ea6', near: '#4b6a82', ground: '#6c8f5a', water: '#4d86b5', band: '#22384f', ink: '#ffffff', rim: '#13212f' },
+  heather:{ sky: '#d9c6e6', sun: '#fff0b0', far: '#a77fb6', mid: '#8a5a9c', near: '#6b3f7d', ground: '#7a6a3a', water: '#5b7fa8', band: '#5a2e6b', ink: '#fbe9ff', rim: '#3a1d46' },
+  moss:   { sky: '#cfe6b8', sun: '#fff3a0', far: '#9cbf7a', mid: '#6f9a52', near: '#4a7a36', ground: '#3f6a2c', water: '#4f8fb8', band: '#2f5a22', ink: '#f4ffe6', rim: '#1e3a15' },
+  autumn: { sky: '#f6d68e', sun: '#fff6cf', far: '#d49a5b', mid: '#b8683a', near: '#8a4a2a', ground: '#6b5a2a', water: '#5b8fb0', band: '#7a3b1d', ink: '#fff1dc', rim: '#4a220f' },
+  sea:    { sky: '#bfe7f0', sun: '#ffe27a', far: '#8cc0c9', mid: '#5aa0b0', near: '#3a7f8f', ground: '#6aa05a', water: '#2f78b0', band: '#0f4c6b', ink: '#f2fbff', rim: '#08324a' },
+  city:   { sky: '#ffd3b0', sun: '#ffffff', far: '#c9a39a', mid: '#8c6c78', near: '#4b3f5a', ground: '#5d7a4a', water: '#4f7fa8', band: '#2b2d42', ink: '#ffe8d6', rim: '#1b1c2b' },
+  night:  { sky: '#2c3e66', sun: '#f6f1c8', far: '#44507a', mid: '#34406a', near: '#222b4a', ground: '#2f4a3a', water: '#3d5f8f', band: '#121a33', ink: '#f6e7a8', rim: '#0a0f20' }
+};
+const PATCH = {
+  penyfan: ['ridge', 'dawn'], scafell: ['peak', 'snow'], ilkleymoor: ['stones', 'heather'], penyghent: ['lion', 'moss'], cadair: ['lake', 'dusk'],
+  sevensisters: ['cliffs', 'sea', 'light'], mamtor: ['ridge', 'autumn'], malham: ['cove', 'day'], withens: ['ruin', 'heather'], coniston: ['lake', 'dawn'],
+  snowdon: ['peak', 'dusk', '#8f1d1d'], stoodley: ['monument', 'moss'], benlomond: ['lake', 'day'], helvellyn: ['edge', 'night'], kinder: ['falls', 'heather'],
+  skiddaw: ['peak', 'autumn'], ingleborough: ['tabletop', 'day'], bennevis: ['peak', 'snow', '#a37b12'], benmacdui: ['peak', 'night'], '3peaks': ['sheep', 'moss'],
+  zennor: ['cliffs', 'sea'], saltaire: ['canal', 'autumn'], strid: ['falls', 'moss'], whitby: ['abbey', 'dusk'], dunstanburgh: ['castle', 'sea'],
+  thamespath: ['bridge', 'day'], fountains: ['abbey', 'moss'], monsal: ['viaduct', 'autumn'], regentscanal: ['canal', 'city'], derwentwater: ['lake', 'dawn'],
+  waterofleith: ['castle', 'night'], tissington: ['viaduct', 'day'], marathon: ['city', 'day'], dalesway: ['bridge', 'dawn'], hadrian: ['wall', 'moss'],
+  arthurseat: ['lion', 'dusk'], idwal: ['lake', 'snow'], catbells: ['ridge', 'autumn'], oldharry: ['stacks', 'day'], grasmere: ['lake', 'moss'],
+  sycamoregap: ['sycamore', 'autumn'], malvern: ['ridge', 'dusk'], fairfield: ['edge', 'autumn'],
+  yorkwalls: ['castle', 'city'], kirkstall: ['abbey', 'autumn'], hardcastle: ['falls', 'moss'], flamborough: ['cliffs', 'dawn', 'light'],
+  spurn: ['coast2', 'day'], hornsea: ['viaduct', 'sea'], cindertrack: ['viaduct', 'dusk'],
+  whw: ['thistle', 'dusk'], cotswold: ['abbey', 'autumn'], leedsliverpool: ['canal', 'dusk'], c2c: ['coast2', 'sea'], pennine: ['ridge', 'heather'], lejog: ['compass', 'night', '#a37b12']
+};
+// one satin-stitched shape: the colour, then a fine stitch-direction sheen over it
+const st = (d, fill, sheen = 'pSatin') => `<path d="${d}" fill="${fill}"/><path d="${d}" fill="url(#${sheen})"/>`;
+const sunAt = (x, y, r, c) => st(`M${x - r} ${y}a${r} ${r} 0 1 0 ${2 * r} 0a${r} ${r} 0 1 0 ${-2 * r} 0Z`, c, 'pSatin2');
+const GROUND = (p, y = 84) => st(`M18 ${y}Q60 ${y - 5} 102 ${y}L102 102L18 102Z`, p.ground);
+const SCENES = {
+  peak: p => sunAt(82, 40, 7, p.sun) + st('M18 78L40 58L52 66L70 50L102 74L102 102L18 102Z', p.far)
+    + st('M26 88L58 34L90 88Z', p.near) + st('M58 34L49 49L54 47L58 52L62 46L67 49Z', '#fbfbf7', 'pSatin2') + GROUND(p, 86),
+  ridge: p => sunAt(44, 42, 8, p.sun) + st('M18 70Q40 50 58 62T102 56L102 102L18 102Z', p.far)
+    + st('M18 80Q45 62 66 74T102 68L102 102L18 102Z', p.mid) + st('M18 90Q50 78 102 86L102 102L18 102Z', p.near),
+  lion: p => sunAt(36, 40, 6, p.sun) + st('M18 82L30 74L44 70L52 58L60 52L70 54L76 62L102 70L102 102L18 102Z', p.mid)
+    + st('M52 58L60 52L70 54L66 58L58 58Z', p.near) + GROUND(p, 88),
+  tabletop: p => sunAt(80, 38, 6, p.sun) + st('M18 84L34 70L46 54L74 54L84 68L102 80L102 102L18 102Z', p.mid)
+    + st('M46 54L74 54L72 58L48 58Z', p.near) + GROUND(p, 90),
+  edge: p => sunAt(80, 36, 5, p.sun) + st('M18 74L48 46L60 40L102 70L102 102L18 102Z', p.far)
+    + st('M22 92L40 70L50 66L58 60L64 62L72 56L82 64L102 88L102 102L18 102Z', p.near) + st('M18 98Q60 88 102 98L102 102L18 102Z', p.water),
+  lake: p => sunAt(60, 40, 7, p.sun) + st('M18 72L36 50L50 62L64 44L82 60L102 52L102 102L18 102Z', p.mid)
+    + st('M18 72L102 72L102 102L18 102Z', p.water) + st('M30 80Q60 76 90 80', 'none') + `<path d="M28 80H48M58 86H86M36 92H62" stroke="#fff" stroke-width="1.4" stroke-linecap="round" opacity=".7"/>`
+    + st('M54 76L66 76L63 79L57 79Z', p.band),
+  stones: p => st('M18 76Q60 62 102 74L102 102L18 102Z', p.mid) + st('M18 88Q60 80 102 88L102 102L18 102Z', p.near)
+    + st('M28 62L42 58L50 64L46 74L30 74Z', '#9c9588') + st('M44 56L52 54L56 60L50 64L42 60Z', '#b5ad9f')
+    + [60, 66, 72, 78, 84, 90].map((x, i) => st(`M${x} ${78 - (i % 2) * 2}h3.6v${-6 - (i % 3)}h-3.6Z`, '#d6d0c2', 'pSatin2')).join(''),
+  ruin: p => sunAt(80, 40, 6, p.sun) + st('M18 74Q60 64 102 72L102 102L18 102Z', p.mid) + st('M18 86Q60 78 102 86L102 102L18 102Z', p.near)
+    + st('M44 74V62L52 56L60 62V74Z', '#8d8577') + st('M47 74V66H51V74Z', p.sky) + st('M54 66H58V70H54Z', p.sky)
+    + st('M70 74V60', 'none') + `<path d="M72 74V60M72 64L66 58M72 62L78 57" stroke="#3b2f22" stroke-width="2" stroke-linecap="round" fill="none"/>`,
+  cove: p => st('M18 50Q60 34 102 50L102 102L18 102Z', '#ded7c6') + `<path d="M24 56Q60 42 96 56M26 64Q60 52 94 64M28 72Q60 62 92 72" stroke="#b9b09c" stroke-width="1.6" fill="none"/>`
+    + st('M18 30H102V48Q60 32 18 48Z', p.sky) + st('M18 80Q60 72 102 80L102 102L18 102Z', p.ground) + st('M52 80Q58 90 54 102H66Q62 90 68 80Z', p.water),
+  monument: p => sunAt(40, 40, 6, p.sun) + st('M18 80Q50 60 102 74L102 102L18 102Z', p.mid) + st('M18 92Q60 84 102 92L102 102L18 102Z', p.near)
+    + st('M60 32L64 40V62L66 64V68H54V64L56 62V40Z', '#5a5246') + st('M56 50H64V52H56Z', p.sky),
+  falls: p => st('M18 40L44 46L44 102L18 102Z', p.near) + st('M76 46L102 40L102 102L76 102Z', p.near)
+    + st('M44 46H76V102H44Z', p.mid) + st('M54 46H66L68 102H52Z', '#e9f5fb', 'pSatin2') + `<path d="M57 52V96M61 50V98M64 54V94" stroke="${p.water}" stroke-width="1" opacity=".6"/>`
+    + st('M18 90Q60 84 102 90L102 102L18 102Z', p.water),
+  sheep: p => st('M18 70L32 58L42 64L54 52L66 62L78 50L102 66L102 102L18 102Z', p.far) + GROUND(p, 80)
+    + st('M40 82Q40 72 52 72Q56 68 62 72Q74 72 74 82Q72 90 62 90H50Q40 90 40 82Z', '#f6f3ea', 'pSatin2')
+    + st('M72 76Q80 74 82 80Q80 86 74 84Z', '#2b2622') + `<path d="M48 90V96M56 90V96M64 90V96" stroke="#2b2622" stroke-width="2.2" stroke-linecap="round"/>`,
+  cliffs: (p, x) => st('M18 76H102V102H18Z', p.water) + st('M18 76V56L32 52L40 60L50 54L60 62L70 56L80 64L102 58V76Z', '#f4f1ea', 'pSatin2')
+    + st('M18 56L32 52L40 60L50 54L60 62L70 56L80 64L102 58V54L80 60L70 52L60 58L50 50L40 56L32 48L18 52Z', p.ground)
+    + `<path d="M24 84q4 -3 8 0t8 0M54 90q4 -3 8 0t8 0M78 84q4 -3 8 0t8 0" stroke="#fff" stroke-width="1.4" fill="none" stroke-linecap="round"/>`
+    + (x === 'light' ? st('M84 76L86 62H90L92 76Z', '#f4f1ea') + st('M85 70H91V73H85Z', '#c0392b') + st('M86 60H90V62H86Z', '#c0392b') : ''),
+  coast2: p => sunAt(60, 42, 8, p.sun) + st('M18 68Q36 66 40 72L36 102H18Z', p.water) + st('M80 72Q84 66 102 68V102H84Z', p.water)
+    + st('M36 102L40 72Q60 58 80 72L84 102Z', p.mid) + `<path d="M44 86Q60 78 76 86" stroke="${p.sun}" stroke-width="1.6" stroke-dasharray="2 2" fill="none"/>`,
+  canal: p => st('M18 66Q60 58 102 66V74H18Z', p.ground) + st('M18 74H102V90H18Z', p.water) + st('M18 90H102V102H18Z', p.near)
+    + st('M30 78H64L60 85H34Z', '#a5332b') + st('M38 73H58V78H38Z', '#2f6b3a') + st('M41 74.5H44V77H41ZM48 74.5H51V77H48Z', '#f3d36b')
+    + `<path d="M74 70L90 80M90 70L74 80" stroke="#3a2a1c" stroke-width="2.4" stroke-linecap="round"/>`,
+  bridge: p => st('M18 66L40 54L60 62L80 50L102 60V102H18Z', p.far) + st('M18 74H102V102H18Z', p.water)
+    + st('M24 74V64H96V74H88Q88 66 74 66Q60 66 60 74Q60 66 46 66Q32 66 32 74Z', '#c9b99a') + `<path d="M24 64H96" stroke="#9b8a6b" stroke-width="1.4"/>`,
+  viaduct: p => st('M18 60L40 50L62 58L84 46L102 54V102H18Z', p.far) + st('M18 84Q60 78 102 84V102H18Z', p.ground)
+    + st('M18 58H102V64H18Z', '#9b8a6b') + [26, 42, 58, 74, 90].map(x => st(`M${x - 7} 64V86H${x - 5}Q${x - 5} 70 ${x} 70Q${x + 5} 70 ${x + 5} 86H${x + 7}V64Z`, '#b3a283')).join(''),
+  abbey: p => sunAt(80, 38, 6, p.sun) + GROUND(p, 82) + st('M34 82V54L42 46L50 54V82Z', '#c8bba3') + st('M50 82V60H74V82Z', '#b7a98f')
+    + st('M74 82V48L80 42L86 48V82Z', '#c8bba3') + st('M39 80V60Q42 54 45 60V80Z', p.sky) + st('M55 80V68Q58 63 61 68V80ZM64 80V68Q67 63 70 68V80Z', p.sky)
+    + st('M78 66Q80 60 82 66V80H78Z', p.sky),
+  castle: p => st('M18 80H102V102H18Z', p.water) + st('M18 80Q40 64 70 66Q90 68 102 80Z', p.ground)
+    + st('M36 70V54H40V50H44V54H48V50H52V54H56V70Z', '#8a8273') + st('M60 68V46H62V43H65V46H68V43H71V46H73V68Z', '#9c9484')
+    + st('M44 70V62Q46 58 48 62V70Z', '#3a352e') + st('M65 66V58Q66.5 55 68 58V66Z', '#3a352e')
+    + `<path d="M26 90q4 -3 8 0t8 0M70 92q4 -3 8 0t8 0" stroke="#fff" stroke-width="1.3" fill="none"/>`,
+  wall: p => st('M18 62L36 56L52 64L70 52L102 62V102H18Z', p.far) + st('M18 74L40 66L58 74L80 62L102 70V102H18Z', p.mid)
+    + `<path d="M18 74L40 66L58 74L80 62L102 70" stroke="#b9ae97" stroke-width="5" fill="none" stroke-linejoin="round"/>`
+    + `<path d="M22 70.5v-3M30 67.5v-3M38 65v-3M46 66v-3M54 70v-3M62 71v-3M70 66v-3M78 61.5v-3M88 63v-3M96 66.5v-3" stroke="#b9ae97" stroke-width="3"/>`
+    + st('M18 86Q60 80 102 86V102H18Z', p.near),
+  city: p => st('M18 80H102V102H18Z', p.water) + st('M30 80V44L33 38L36 44V80Z', '#c9a86a') + st('M31 50H35V54H31Z', '#f5f0dc')
+    + st('M48 80V52H54V80ZM78 80V52H84V80Z', '#8d8a99') + st('M48 52L51 46L54 52ZM78 52L81 46L84 52Z', '#5a5f75')
+    + st('M54 60H78V63H54Z', '#5a7fa8') + `<path d="M54 64Q66 74 78 64" stroke="#8d8a99" stroke-width="2" fill="none"/>`
+    + `<path d="M22 90q4 -3 8 0t8 0M62 92q4 -3 8 0t8 0" stroke="#fff" stroke-width="1.2" fill="none" opacity=".8"/>`,
+  thistle: p => st('M18 66L38 46L52 58L70 40L102 62V102H18Z', p.mid) + GROUND(p, 86)
+    + `<path d="M60 92V64M60 78L50 70M60 74L70 66" stroke="#4f7a3a" stroke-width="2.6" stroke-linecap="round" fill="none"/>`
+    + st('M54 64Q54 56 60 56Q66 56 66 64Z', '#6fa04a') + st('M54 56Q55 46 60 44Q65 46 66 56Z', '#9b4f9e', 'pSatin2'),
+  sycamore: p => st('M18 66L44 52L60 62L78 50L102 60V102H18Z', p.far) + st('M18 76L40 64L58 74L80 62L102 70V102H18Z', p.mid)
+    + `<path d="M18 76L40 64L54 72M66 70L80 62L102 70" stroke="#b9ae97" stroke-width="4.5" fill="none" stroke-linejoin="round"/>`
+    + st('M59 72V58', 'none') + `<path d="M60 74V56" stroke="#5a3b22" stroke-width="2.6" stroke-linecap="round"/>`
+    + st('M46 52Q48 36 60 34Q72 36 74 52Q66 58 60 56Q52 58 46 52Z', p.near) + st('M18 88Q60 82 102 88V102H18Z', p.ground),
+  stacks: p => st('M18 74H102V102H18Z', p.water) + st('M18 74V48L40 46L52 52V74Z', '#f2efe6', 'pSatin2') + st('M18 48L40 46L52 52V49L40 43L18 45Z', p.ground)
+    + st('M60 74V56L66 54L70 58V74Z', '#ebe7dc', 'pSatin2') + st('M76 74V62L80 60L83 64V74Z', '#ebe7dc', 'pSatin2') + st('M88 74V66L91 65L93 68V74Z', '#e2ddd0')
+    + `<path d="M24 84q4 -3 8 0t8 0M58 90q4 -3 8 0t8 0M82 84q4 -3 8 0t8 0" stroke="#fff" stroke-width="1.4" fill="none" stroke-linecap="round"/>`,
+  compass: p => st('M18 18H102V102H18Z', p.water) + `<circle cx="60" cy="60" r="26" fill="none" stroke="${p.ink}" stroke-width="1.4" stroke-dasharray="2 2"/>`
+    + st('M60 30L66 60L60 90L54 60Z', '#f6e7a8', 'pSatin2') + st('M60 30L66 60H54Z', '#c0392b') + st('M30 60L60 54L90 60L60 66Z', '#d9d2bf')
+    + `<path d="M40 82Q50 70 62 66T84 40" stroke="#f6e7a8" stroke-width="1.6" stroke-dasharray="3 2.5" fill="none"/>`
+};
+/* Challenges earn patches too: anyone who reaches the end of a household challenge stitches that journey's
+ * patch, and their best place puts a metal ring round it: gold for 1st, silver for 2nd, bronze for 3rd.
+ * A better place in a later challenge on the same journey replaces the ring (best result wins). */
+function chPatchResults(pid = profiles.current){
+  const out = {};
+  if (profiles.list.length < 2) return out;
+  chAll().filter(c => c.status === 'active' && (c.owner === pid || c.accepted.includes(pid))).forEach(c => {
+    const s = chStandings(c), i = s.rows.findIndex(r => r.pid === pid), me = s.rows[i];
+    if (!me || !me.fin) return;
+    (out[c.j] = out[c.j] || []).push({ place: i + 1, when: me.fin, c, rivals: s.rows.filter(r => r.pid !== pid).map(r => r.name), of: s.rows.length });
+  });
+  Object.values(out).forEach(a => a.sort((x, y) => x.when - y.when));
+  return out;
+}
+const bestPlace = res => res && res.length ? Math.min(...res.map(r => r.place)) : null;
+const RING = { 1: ['gRingGold', 'Gold'], 2: ['gRingSilver', 'Silver'], 3: ['gRingBronze', 'Bronze'] };
+const placeTxt = n => n === 1 ? '1st' : n === 2 ? '2nd' : n === 3 ? '3rd' : n + 'th';
+const patchDone = (pid = profiles.current) => {
+  const out = {}; (psOf(pid).journeysDone || []).forEach(x => { if (jById(x.id)) (out[x.id] = out[x.id] || []).push(x); });
+  return out;
+};
+// the patch itself; size in CSS px, earned decides colour or a faded, unstitched outline
+function patchSvg(j, earned, size = 96, tag = '', place = null){
+  const [scene, pal, rimC] = PATCH[j.id] || ['ridge', 'day'], p = PAL[pal], rim = rimC && rimC[0] === '#' ? rimC : p.rim;
+  const extra = rimC && rimC[0] !== '#' ? rimC : '';
+  const uid = 'pt' + tag + j.id.replace(/\W/g, ''), name = (j.patch || j.name).toUpperCase().replace(/’/g, "'");
+  const top = name.length > 26 ? name.replace(/ TO /, ' · ').replace(/^THAMES PATH: /, '') : name;
+  const fs = Math.min(9.2, 118 / (top.length * .64)), sub = j.prof ? `${fD(jLen(j) * 1000, jLen(j) < 20 ? 1 : 0)} ${dU().toUpperCase()} · ${Math.round(jAscent(j))} M` : `${fD(jLen(j) * 1000, jLen(j) < 20 ? 1 : 0)} ${dU().toUpperCase()}`;
+  const ring = earned && RING[place];
+  // the view always leaves room for a ring, so patches with and without one line up the same size
+  return `<svg viewBox="-6 -6 132 132" width="${size}" height="${size}" class="patch${earned ? '' : ' unsewn'}" role="img" aria-label="${esc(j.name)} patch${earned ? '' : ', not yet earned'}${ring ? `, ${ring[1].toLowerCase()} ring for ${placeTxt(place)} place in a challenge` : ''}">
+    <defs><clipPath id="${uid}c"><circle cx="60" cy="60" r="38"/></clipPath>
+      <path id="${uid}t" d="M17 60A43 43 0 0 1 103 60"/><path id="${uid}b" d="M14 62A46 46 0 0 0 106 62"/></defs>
+    <g class="pshadow">${ring ? `<circle cx="60" cy="60" r="61.6" fill="url(#${ring[0]})"/><circle cx="60" cy="60" r="61.6" fill="none" stroke="#000" stroke-opacity=".25" stroke-width=".6"/>
+      <circle cx="60" cy="60" r="59.4" fill="none" stroke="#fff" stroke-opacity=".45" stroke-width=".7"/>` : ''}<circle cx="60" cy="60" r="57.5" fill="${rim}"/>
+      <circle cx="60" cy="60" r="55.6" fill="none" stroke="${p.ink}" stroke-width="3.6" stroke-dasharray="0.75 0.85" opacity=".55"/>
+      <circle cx="60" cy="60" r="53" fill="${p.band}"/><circle cx="60" cy="60" r="53" fill="url(#pTwill)"/>
+      <g clip-path="url(#${uid}c)" class="pthread"><rect x="18" y="18" width="84" height="84" fill="${p.sky}"/><rect x="18" y="18" width="84" height="84" fill="url(#pTwill)"/>${SCENES[scene](p, extra)}</g>
+      <circle cx="60" cy="60" r="38.6" fill="none" stroke="${rim}" stroke-width="2.4"/>
+      <circle cx="60" cy="60" r="41.4" fill="none" stroke="${p.ink}" stroke-width=".9" stroke-dasharray="1.8 1.3" opacity=".8"/>
+      <text class="ptext" font-size="${fs.toFixed(1)}" fill="${p.ink}"><textPath href="#${uid}t" startOffset="50%" text-anchor="middle">${esc(top)}</textPath></text>
+      <text class="ptext psub" font-size="6.6" fill="${p.ink}"><textPath href="#${uid}b" startOffset="50%" text-anchor="middle">${esc(sub)}</textPath></text>
+    </g></svg>`;
+}
+function renderPatches(){
+  const box = $('#patches'); if (!box) return;
+  const done = patchDone(), chr = chPatchResults(), got = j => !!(done[j.id] || chr[j.id]), have = JOURNEYS.filter(got).length, cur = jState();
+  $('#patchCount').textContent = `${curProfile().name} has stitched ${have} of ${JOURNEYS.length} patches. Finish a journey, or a household challenge, to earn its patch. Challenge places add a gold, silver or bronze ring. Tap a patch to see your record.`;
+  const groups = ['mountain', 'walk', 'route'];
+  box.innerHTML = groups.map(k => {
+    const js = JOURNEYS.filter(j => (j.kind || 'route') === k), n = js.filter(got).length;
+    return `<h4 class="bgrp">${JKIND[k].split(',')[0].split(':')[0]}<span>${n} of ${js.length}</span></h4><div class="pgrid">${js.map(j => {
+      const d = done[j.id], cr = chr[j.id], bp = bestPlace(cr), inProg = cur && !cur.done && cur.j.id === j.id;
+      const last = Math.max(d ? d[d.length - 1].end : 0, cr ? cr[cr.length - 1].when : 0), times = (d ? d.length : 0) + (cr ? cr.length : 0);
+      return `<button class="pcell${d || cr ? '' : ' locked'}" data-patch="${j.id}" aria-label="${esc(j.name)}">${patchSvg(j, !!(d || cr), 92, '', bp)}
+        <span class="pname">${esc(j.name)}</span><span class="bwhen">${d || cr ? `${bp && bp <= 3 ? ['🥇', '🥈', '🥉'][bp - 1] + ' ' : ''}${times > 1 ? `×${times}, ` : ''}${fmtDate(last)}` : inProg ? `${Math.round(cur.km / cur.len * 100)}% done` : jPausedKm(j.id) != null ? `⏸ ${Math.round(jPausedKm(j.id) / jLen(j) * 100)}% done` : 'Not yet'}</span></button>`;
+    }).join('')}</div>`;
+  }).join('');
+}
+function openPatch(id){
+  const j = jById(id); if (!j) return;
+  const d = patchDone()[id], cr = chPatchResults()[id], bp = bestPlace(cr), m = jRunMap(), runs = store.get(KEY, []), dlg = $('#patchDlg'), cur = jState();
+  const crRows = (cr || []).map(x => `<li>${x.place <= 3 ? ['🥇', '🥈', '🥉'][x.place - 1] + ' ' : ''}${x.place === 1 ? 'Won' : `Came ${placeTxt(x.place)} in`} the challenge against ${esc(andList(x.rivals))}, finishing ${fmtDate(x.when)}.</li>`);
+  const rows = (d || []).map(x => { const rs = runs.filter(r => m.has(r.id) && m.get(r.id).j.id === id && inSpans(r.date, jSpans(x)));
+    const days = Math.max(1, Math.round((x.end - x.start) / DAY));
+    return `<li>Finished ${fmtDate(x.end)}, in ${days} day${days === 1 ? '' : 's'}${rs.length ? ` and ${rs.length} run${rs.length === 1 ? '' : 's'}` : ''}${j.prof ? `, ${Math.round(jAscent(j)).toLocaleString('en-GB')} m climbed` : ''}.</li>`; });
+  dlg.innerHTML = `<div class="pbig">${patchSvg(j, !!(d || cr), 220, 'big', bp)}</div><h3>${esc(j.name)}</h3>${bp && bp <= 3 ? `<p class="pring">${RING[bp][1]} ring: your best challenge place is ${placeTxt(bp)}</p>` : ''}<p class="muted">${esc(j.blurb)}</p>
+    ${d || cr ? `<ul class="sumlist">${rows.join('')}${crRows.join('')}</ul>` : cur && !cur.done && cur.j.id === id ? `<p>You’re ${Math.round(cur.km / cur.len * 100)}% of the way. ${kmU(cur.len - cur.km)} to go to stitch this patch.</p>`
+      : jPausedKm(id) != null ? `<p>⏸ Paused at ${kmU(jPausedKm(id))}. Resume it to carry on and stitch this patch.</p>` : '<p>Finish this journey to stitch its patch.</p>'}
+    <div class="drow"><span>${!d && !cr && !(cur && cur.j.id === id && !cur.done) ? `<button class="sm primary" id="patchGo">${jPausedKm(id) != null ? 'Resume this journey' : 'Start this journey'}</button>` : ''}</span><button id="patchClose">Close</button></div>`;
+  dlg.querySelector('#patchClose').onclick = () => dlg.close();
+  const go = dlg.querySelector('#patchGo');
+  if (go) go.onclick = () => { dlg.close(); journeyGo(id); };
+  dlg.showModal();
 }
 
 function renderPcard(){
@@ -5392,7 +5730,7 @@ function openPEdit(){
   d.showModal();
 }
 function renderHistory(){
-  renderPcard(); showPsub(psub); renderBadges(); renderWeight();
+  renderPcard(); showPsub(psub); renderBadges(); renderWeight(); renderPatches();
   { const st = computeStreak(allRuns()); refreshStreak(st); renderStreakBox(st); }
   $('#bkNagH').innerHTML = backupDue() ? backupNag() : '';
   const runs = allRuns();
@@ -5918,6 +6256,7 @@ $('#holList').addEventListener('click', e => {
 });
 $('#holClose').onclick = () => $('#holDlg').close();
 $('#psub').addEventListener('click', e => { const b = e.target.closest('[data-p]'); if (b) showPsub(b.dataset.p); });
+$('#patches').addEventListener('click', e => { const b = e.target.closest('[data-patch]'); if (b) openPatch(b.dataset.patch); });
 $('#pcard').addEventListener('click', e => { if (e.target.closest('#pcEdit, #pcAdd')) openPEdit(); });
 $('#peGender').addEventListener('click', e => { const b = e.target.closest('[data-g]'); if (!b) return; $$('#peGender button').forEach(x => x.classList.toggle('on', x === b)); });
 $('#peCancel').onclick = () => $('#pEditDlg').close();
@@ -5988,9 +6327,9 @@ $('#jrBox').addEventListener('click', e => {
   if (b.dataset.jr === 'pick') openJourneys();
   else if (b.dataset.jr === 'stop'){
     const st = jState();
-    if (st && !st.done && !confirm(`Stop ${st.j.name}? Your progress on it will be lost.`)) return;
-    delete settings.journey; saveSettings(); renderJourney();
-  }
+    pauseJourney(); renderWorkouts(); renderTerrain();
+    if (st && !st.done && st.km > 0) toast(`${st.j.name} paused at ${kmU(st.km)}. Pick it again any time to carry on.`);
+  } else if (b.dataset.jr === 'resume') journeyGo(b.dataset.id);
 });
 $('#wtBox').addEventListener('click', e => {
   const v = e.target.closest('[data-wtv]');
