@@ -1,5 +1,5 @@
 /* MeMentum: notifications (Android app only).
- *  - Streak reminder at a chosen time, only on days you haven't secured yet (skips holidays).
+ *  - Streak reminder at a chosen time, only when both of the week's freezes are used and the day isn't secured yet (skips holidays).
  *  - Weekly report + medals on Monday at 8am.
  *  - "Run in progress" notification during a run, which keeps Bluetooth alive in the background.
  * Reminders are re-booked for the next 7 days whenever the app is opened or a run ends, and a
@@ -47,22 +47,25 @@
   }
 
   /* ---------- streak reminders ---------- */
+  // Only warns on a day when missing it would end the streak, i.e. both of that week's freezes are already
+  // used. Future days assume you miss every day until then (the worst case); a run re-books everything,
+  // so a reminder that's no longer needed is cancelled.
   function streakNotes() {
-    var st = app.computeStreak(app.allRuns()), now = Date.now(), out = [];
+    var st = app.computeStreak(app.allRuns()), now = Date.now(), out = [], F = app.freezesPerWeek || 2;
     if (!st.current && !st.todayActive) return out;      // no streak to protect
+    var used = {}; used[app.weekStart(now).getTime()] = F - st.freezesLeft;
     for (var i = 0; i < 7; i++) {
-      var when = at(i, N.nStreakAt);
-      if (when.getTime() <= now + 60000) continue;
-      if (st.holiday && st.holiday.has(app.dayKey(when.getTime()))) continue;
-      if (i === 0) {
-        if (st.todayActive) continue;
-        var n = st.current, f = st.freezesLeft;
-        out.push(f > 0
-          ? note(STREAK_BASE, '🔥 ' + who() + n + '-day streak', 'No run yet today. 10 minutes keeps it going. If you can’t, a freeze will cover today (' + f + ' left this week).', when)
-          : note(STREAK_BASE, '🔥 ' + who() + n + '-day streak is at risk', 'No freezes left this week. 10 minutes on the treadmill today keeps it alive.', when));
-      } else {
-        out.push(note(STREAK_BASE + i, '🔥 Keep ' + (many() ? app.profileName() + '’s' : 'your') + ' streak going', '10 minutes on the treadmill today keeps the streak alive.', when));
+      var when = at(i, N.nStreakAt), wk = app.weekStart(when.getTime()).getTime();
+      if (used[wk] == null) used[wk] = 0;
+      if (st.holiday && st.holiday.has(app.dayKey(when.getTime()))) continue;  // on holiday: the streak waits
+      if (i === 0 && st.todayActive) continue;                                   // today already secured
+      if (used[wk] >= F) {
+        if (when.getTime() > now + 60000) out.push(i === 0
+          ? note(STREAK_BASE, '🔥 ' + who() + st.current + '-day streak is at risk', 'Both freezes are used this week. 10 minutes on the treadmill today keeps it alive.', when)
+          : note(STREAK_BASE + i, '🔥 ' + (many() ? app.profileName() + '’s' : 'Your') + ' streak is at risk', 'Both freezes are used this week. 10 minutes on the treadmill today keeps it alive.', when));
+        break;   // if this day is missed too, the streak ends, so there's nothing left to remind about
       }
+      used[wk]++;  // assume this day is missed and a freeze covers it
     }
     return out;
   }
@@ -136,11 +139,13 @@
     if (!anchor || document.getElementById('nStreak')) return;
     var t = document.createElement('template');
     t.innerHTML = '<div id="nBox"><h3>Notifications</h3>' +
-      '<label class="check"><input type="checkbox" id="nStreak"><span>Remind me when my streak needs a run</span></label>' +
+      '<label class="check"><input type="checkbox" id="nStreak"><span>Remind me when my streak is at risk (both freezes used)</span></label>' +
       '<div class="field"><span class="flabel">Reminder time</span><input type="time" id="nStreakAt"></div>' +
       '<label class="check"><input type="checkbox" id="nWeekly"><span>Weekly report and medals, Monday at 8am</span></label>' +
       '<label class="check"><input type="checkbox" id="nRun"><span>Show a notification during runs</span></label>' +
-      '<p class="fhint">The run notification keeps the treadmill and heart rate connected if the screen turns off or you switch apps. Reminders follow whichever profile was last used on this phone.</p></div>';
+      '<p class="fhint">The run notification keeps the treadmill, heart rate, workout steps and spoken cues going if the screen turns off or you switch to another app, such as YouTube. Keep it on for background tracking. Reminders follow whichever profile was last used on this phone.</p>' +
+      '<div id="nBatt" hidden><p class="fhint"><strong>Battery saving may pause MeMentum in the background.</strong> Allow it to run unrestricted so runs keep tracking while you use other apps.</p>' +
+      '<button class="sm" id="nBattBtn">Allow background running</button></div></div>';
     anchor.parentNode.insertBefore(t.content, anchor);
     var $ = function (id) { return document.getElementById(id); };
     $('nStreak').checked = !!N.nStreak; $('nStreakAt').value = N.nStreakAt;
@@ -156,6 +161,15 @@
       });
     });
     $('nStreakAt').addEventListener('change', function () { if ($('nStreakAt').value) { N.nStreakAt = $('nStreakAt').value; savePrefs(); reschedule(); } });
+    // show the battery prompt only while Android would still restrict MeMentum; re-check when you come back from Settings
+    var battCheck = function () {
+      call(RUN, 'batteryStatus').then(function (r) { $('nBatt').hidden = !!(r && r.unrestricted); }).catch(function () {});
+    };
+    battCheck();
+    document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible') battCheck(); });
+    $('nBattBtn').addEventListener('click', function () {
+      call(RUN, 'requestUnrestricted').catch(function () { app.toast('Open Android Settings > Apps > MeMentum > Battery and choose Unrestricted.'); });
+    });
     $('nRun').addEventListener('change', function () {
       N.nRun = $('nRun').checked; savePrefs();
       if (N.nRun) allowed();
