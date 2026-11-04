@@ -80,6 +80,12 @@
     <uses-permission android:name="android.permission.health.WRITE_ELEVATION_GAINED" />
     <uses-permission android:name="android.permission.health.WRITE_STEPS" />
     <uses-permission android:name="android.permission.health.READ_WEIGHT" />
+    <!-- Health Connect: read walks and runs from other apps (e.g. Garmin Connect) for review -->
+    <uses-permission android:name="android.permission.health.READ_EXERCISE" />
+    <uses-permission android:name="android.permission.health.READ_DISTANCE" />
+    <uses-permission android:name="android.permission.health.READ_STEPS" />
+    <uses-permission android:name="android.permission.health.READ_HEART_RATE" />
+    <uses-permission android:name="android.permission.health.READ_ACTIVE_CALORIES_BURNED" />
     <queries>
         <package android:name="com.google.android.apps.healthdata" />
     </queries>
