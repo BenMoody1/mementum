@@ -7,6 +7,7 @@ import androidx.activity.result.ActivityResult
 import androidx.activity.result.ActivityResultLauncher
 import androidx.health.connect.client.HealthConnectClient
 import androidx.health.connect.client.PermissionController
+import androidx.health.connect.client.aggregate.AggregateMetric
 import androidx.health.connect.client.permission.HealthPermission
 import androidx.health.connect.client.records.ActiveCaloriesBurnedRecord
 import androidx.health.connect.client.records.DistanceRecord
@@ -19,6 +20,7 @@ import androidx.health.connect.client.records.StepsRecord
 import androidx.health.connect.client.records.WeightRecord
 import androidx.health.connect.client.records.metadata.Device
 import androidx.health.connect.client.records.metadata.Metadata
+import androidx.health.connect.client.request.AggregateRequest
 import androidx.health.connect.client.request.ReadRecordsRequest
 import androidx.health.connect.client.time.TimeRangeFilter
 import androidx.health.connect.client.units.Energy
@@ -49,6 +51,10 @@ import org.json.JSONObject
  * It also reads weigh-ins (from Renpho Health or any other scale app that shares weight with
  * Health Connect). Weight has its own permission, asked for separately, so turning on weight
  * import never depends on run sync and the other way round.
+ *
+ * Walks and runs recorded by other apps (Garmin Connect and the like) can be listed with
+ * readActivities. Nothing is saved from here: the app shows them for review and only keeps the
+ * ones the person approves. Reading them needs its own read permissions, asked for separately.
  */
 @CapacitorPlugin(name = "MeMentumHealth")
 class HealthConnectPlugin : Plugin() {
@@ -69,6 +75,17 @@ class HealthConnectPlugin : Plugin() {
     private val permissions: Set<String>
         get() = kinds.keys.map { HealthPermission.getWritePermission(it) }.toSet()
     private val weightPermission = HealthPermission.getReadPermission(WeightRecord::class)
+    private val sessionRead = HealthPermission.getReadPermission(ExerciseSessionRecord::class)
+    private val activityReads: Set<String> = setOf(
+        ExerciseSessionRecord::class, DistanceRecord::class, StepsRecord::class,
+        HeartRateRecord::class, ActiveCaloriesBurnedRecord::class
+    ).map { HealthPermission.getReadPermission(it) }.toSet()
+    private val activityTypes = mapOf(
+        ExerciseSessionRecord.EXERCISE_TYPE_WALKING to "walk",
+        ExerciseSessionRecord.EXERCISE_TYPE_RUNNING to "run",
+        ExerciseSessionRecord.EXERCISE_TYPE_RUNNING_TREADMILL to "treadmill",
+        ExerciseSessionRecord.EXERCISE_TYPE_HIKING to "hike"
+    )
 
     private fun available() = HealthConnectClient.getSdkStatus(context) == HealthConnectClient.SDK_AVAILABLE
     private fun client() = HealthConnectClient.getOrCreate(context)
@@ -104,6 +121,7 @@ class HealthConnectPlugin : Plugin() {
                 val names = JSArray()
                 kinds.forEach { (type, kind) -> if (granted.contains(HealthPermission.getWritePermission(type))) names.put(kind) }
                 if (granted.contains(weightPermission)) names.put("weight")
+                if (granted.contains(sessionRead)) names.put("activities")
                 ret.put("granted", names)
                 call.resolve(ret)
             } catch (e: Exception) {
@@ -115,8 +133,13 @@ class HealthConnectPlugin : Plugin() {
     @PluginMethod
     fun requestAccess(call: PluginCall) {
         if (!available()) { call.reject("Health Connect isn't available on this phone"); return }
-        // { weight: true } asks only for reading weight; otherwise the run-writing permissions
-        val wanted = if (call.getBoolean("weight", false) == true) setOf(weightPermission) else permissions
+        // { weight: true } asks only for reading weight, { activities: true } only for reading
+        // other apps' walks and runs; otherwise the run-writing permissions
+        val wanted = when {
+            call.getBoolean("weight", false) == true -> setOf(weightPermission)
+            call.getBoolean("activities", false) == true -> activityReads
+            else -> permissions
+        }
         val l = launcher
         if (l != null) {
             pending = call
@@ -224,6 +247,83 @@ class HealthConnectPlugin : Plugin() {
             } catch (e: Exception) {
                 Log.e(TAG, "Couldn't read weight", e)
                 call.reject(e.message ?: "Couldn't read weight from Health Connect")
+            }
+        }
+    }
+
+    /**
+     * Walks, runs and hikes other apps wrote to Health Connect after `since` (ms), newest first.
+     * MeMentum's own runs are left out. Resolves { activities: [{ id, source, type, title, start,
+     * end, distance (m), steps, avgHr, maxHr, kcal }] }. Totals come only from the app that recorded
+     * the session; any it didn't record, or whose permission was refused, are left out.
+     */
+    @PluginMethod
+    fun readActivities(call: PluginCall) {
+        if (!available()) { call.reject("Health Connect isn't available on this phone"); return }
+        val since = Instant.ofEpochMilli(maxOf(0L, call.getLong("since", 0L) ?: 0L))
+        scope.launch {
+            try {
+                val granted = client().permissionController.getGrantedPermissions()
+                if (!granted.contains(sessionRead)) { call.reject("NO_PERMISSION"); return@launch }
+                val own = context.packageName
+                val sessions = mutableListOf<ExerciseSessionRecord>()
+                var token: String? = null
+                var pages = 0
+                do {
+                    val res = client().readRecords(ReadRecordsRequest(
+                        recordType = ExerciseSessionRecord::class,
+                        timeRangeFilter = TimeRangeFilter.after(since),
+                        ascendingOrder = false,
+                        pageSize = 200,
+                        pageToken = token
+                    ))
+                    res.records.filterTo(sessions) {
+                        it.metadata.dataOrigin.packageName != own && activityTypes.containsKey(it.exerciseType)
+                    }
+                    token = res.pageToken
+                    pages++
+                } while (!token.isNullOrEmpty() && pages < 10)
+
+                val can = { t: KClass<out Record> -> granted.contains(HealthPermission.getReadPermission(t)) }
+                val metrics = mutableSetOf<AggregateMetric<*>>()
+                if (can(DistanceRecord::class)) metrics += DistanceRecord.DISTANCE_TOTAL
+                if (can(StepsRecord::class)) metrics += StepsRecord.COUNT_TOTAL
+                if (can(HeartRateRecord::class)) { metrics += HeartRateRecord.BPM_AVG; metrics += HeartRateRecord.BPM_MAX }
+                if (can(ActiveCaloriesBurnedRecord::class)) metrics += ActiveCaloriesBurnedRecord.ACTIVE_CALORIES_TOTAL
+
+                val out = JSArray()
+                for (s in sessions.take(100)) {
+                    val o = JSObject()
+                    o.put("id", s.metadata.id)
+                    o.put("source", s.metadata.dataOrigin.packageName)
+                    o.put("type", activityTypes[s.exerciseType])
+                    o.put("title", s.title ?: "")
+                    o.put("start", s.startTime.toEpochMilli())
+                    o.put("end", s.endTime.toEpochMilli())
+                    if (metrics.isNotEmpty()) {
+                        try {
+                            val a = client().aggregate(AggregateRequest(
+                                metrics = metrics,
+                                timeRangeFilter = TimeRangeFilter.between(s.startTime, s.endTime),
+                                dataOriginFilter = setOf(s.metadata.dataOrigin)
+                            ))
+                            a[DistanceRecord.DISTANCE_TOTAL]?.let { o.put("distance", it.inMeters) }
+                            a[StepsRecord.COUNT_TOTAL]?.let { o.put("steps", it) }
+                            a[HeartRateRecord.BPM_AVG]?.let { o.put("avgHr", it) }
+                            a[HeartRateRecord.BPM_MAX]?.let { o.put("maxHr", it) }
+                            a[ActiveCaloriesBurnedRecord.ACTIVE_CALORIES_TOTAL]?.let { o.put("kcal", it.inKilocalories) }
+                        } catch (e: Exception) {
+                            Log.w(TAG, "Couldn't total activity ${s.metadata.id}", e)
+                        }
+                    }
+                    out.put(o)
+                }
+                val ret = JSObject()
+                ret.put("activities", out)
+                call.resolve(ret)
+            } catch (e: Exception) {
+                Log.e(TAG, "Couldn't read activities", e)
+                call.reject(e.message ?: "Couldn't read activities from Health Connect")
             }
         }
     }
