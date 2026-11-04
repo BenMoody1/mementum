@@ -12,6 +12,7 @@
 <script src="sync.js"></script>
 <script src="native.js"></script>
 <script src="health.js"></script>
+<script src="activities.js"></script>
 <script src="notify.js"></script>
 <style>
 :root{
@@ -389,6 +390,16 @@ nav.tabs button{padding:0 .15rem;font-size:.86rem}
 .lbnote p{margin:0 0 .6rem}
 .bknag{border-left:6px solid var(--warn);border-radius:0 14px 14px 0;margin-bottom:1rem}
 .bknag strong{display:block;margin-bottom:.3rem}
+.actnag{border-left:6px solid var(--infield);border-radius:0 14px 14px 0;margin-bottom:1rem}
+.actnag strong{display:block;margin-bottom:.3rem}
+.actcard{margin:.7rem 0;border:1px solid var(--rule)}
+.actcard .actsrc{display:block;font-size:.88rem}
+.actcard .stats{margin:.6rem 0 .4rem}
+.actcard .stats .v{font-size:1.25rem}
+.actcard .row{margin-bottom:0}
+.actbtns{justify-content:flex-end}
+.actdup{border-left:4px solid var(--warn);padding:.3rem .6rem;margin:.4rem 0;font-size:.9rem}
+.actedit{display:grid;grid-template-columns:1fr 1fr;gap:.6rem;margin:.4rem 0}
 #tab-leaders h3:first-of-type{margin-top:.8rem}
 .podium{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));align-items:end;gap:.5rem;margin:1.2rem 0 0;padding:0 .2rem}
 .pod{display:flex;flex-direction:column;align-items:center;min-width:0}
@@ -5813,7 +5824,7 @@ function renderHistory(){
   const rowHtml = r => {
     const tags = (r.tags || []).map(t => `<span class="tagchip">${esc(t)}</span>`).join('');
     return `<li><button class="runrow" data-id="${esc(r.id)}">
-      <span class="rl"><span class="rd">${fmtDate(r.date)}</span><span class="rs">${fmtClock(r.date)}${r.workout ? ', ' + esc(r.workout) : ''}</span>${jm && jm.has(r.id) ? `<span class="rs jrow">🗺️ ${esc(jm.get(r.id).j.name)}${jm.get(r.id).finished ? ' 🏁' : jm.get(r.id).towns.length ? `, past ${esc(jm.get(r.id).towns[jm.get(r.id).towns.length - 1])}` : ''}</span>` : ''}${tags ? `<span class="tags">${tags}</span>` : ''}</span>
+      <span class="rl"><span class="rd">${fmtDate(r.date)}</span><span class="rs">${fmtClock(r.date)}${r.workout ? ', ' + esc(r.workout) : r.src ? ', ' + esc(impLabel(r)) : ''}</span>${jm && jm.has(r.id) ? `<span class="rs jrow">🗺️ ${esc(jm.get(r.id).j.name)}${jm.get(r.id).finished ? ' 🏁' : jm.get(r.id).towns.length ? `, past ${esc(jm.get(r.id).towns[jm.get(r.id).towns.length - 1])}` : ''}</span>` : ''}${tags ? `<span class="tags">${tags}</span>` : ''}</span>
       <span class="spark" aria-hidden="true">${sparkline(r)}</span>
       <span class="rr"><span class="rk">${fD(r.dist)} ${dU()}</span><span class="rp">${fmtTime(r.moving)}, ${fP(avgPaceKm(r.moving, r.dist))} /${dU()}</span>${r.steps ? `<span class="rp">${r.steps.toLocaleString('en-GB')} steps</span>` : ''}${r.avgHr ? `<span class="rp">${r.avgHr} bpm avg</span>` : ''}</span>
     </button></li>`;
@@ -5868,6 +5879,21 @@ function runChart(r){
   svg += `<text x="${pl}" y="${H - 3}" class="ax">0:00</text><text x="${W - pr}" y="${H - 3}" class="ax" text-anchor="end">${fmtTime(tMax)}</text>`;
   return svg + `</svg><p class="legend"><span><i style="background:var(--track)"></i>Pace /${dU()} (taller is faster)</span><span><i style="background:var(--infield)"></i>Incline</span>${hb.length > 1 ? '<span><i style="background:var(--warn)"></i>Heart rate, bpm (right)</span>' : ''}</p>`;
 }
+// walks and runs brought in from Health Connect after review (activities.js). They go in date order,
+// are never sent back to Health Connect, and have no samples, so ghosts and best efforts skip them.
+const IMP_TYPES = { walk: 'Walk', run: 'Run', treadmill: 'Treadmill run', hike: 'Hike' };
+const impLabel = r => `${IMP_TYPES[r.actType] || 'Activity'} from ${r.srcApp || 'Health Connect'}`;
+function addImportedRun(rec){
+  const runs = allRuns();
+  if (runs.some(r => r.id === rec.id)) return false;
+  const i = runs.findIndex(r => r.date < rec.date);
+  if (i < 0) runs.push(rec); else runs.splice(i, 0, rec);
+  if (!store.set(KEY, runs)) return false;
+  renderHistory(); renderJourney();
+  return true;
+}
+// once the review is closed, celebrate anything the new activities unlocked
+function afterImport(){ setTimeout(checkNewBadges, 600); setTimeout(journeyCheck, 2600); setTimeout(chCheck, 5000); }
 function updateRun(id, fn){
   const runs = allRuns(), i = runs.findIndex(x => x.id === id);
   if (i < 0) return null;
@@ -5882,7 +5908,7 @@ function openDetail(id){
   const best = splits.length > 1 ? Math.min(...splits) : null;
   let rows = splits.map((sp, i) => `<tr><td>${i + 1}</td><td class="${sp === best ? 'best' : ''}">${fmtTime(sp)}</td></tr>`).join('');
   const rem = r.dist - arr.length * big;
-  if (rem > 50){ const sp = r.moving - prev; rows += `<tr><td>${(rem / big).toFixed(2)}</td><td>${fmtTime(sp)} (${fP(sp / (rem / 1000))} /${dU()})</td></tr>`; }
+  if (rem > 50 && !r.src){ const sp = r.moving - prev; rows += `<tr><td>${(rem / big).toFixed(2)}</td><td>${fmtTime(sp)} (${fP(sp / (rem / 1000))} /${dU()})</td></tr>`; }
   const efforts = BESTS.filter(([k]) => r.best && r.best[k]).map(([k, , label]) => `<div><div class="v">${fmtTime(r.best[k])}</div><div class="l">Best ${label}</div></div>`).join('');
   const zoneTotal = r.zones ? r.zones.reduce((a, b) => a + b, 0) : 0;
   const zones = zoneTotal ? r.zones.map((z, i) => `<div class="zrow"><span>Zone ${i + 1}</span><span class="zbar"><i style="width:${(z / zoneTotal * 100).toFixed(1)}%"></i></span><span>${fmtTime(z)}</span></div>`).join('') : '';
@@ -5892,14 +5918,15 @@ function openDetail(id){
   d.innerHTML = `
     <h3>${fmtDate(r.date)}, ${fmtClock(r.date)}</h3>
     ${r.workout ? `<p class="muted" style="margin:0 0 .4rem">${esc(r.workout)}</p>` : ''}
+    ${r.src ? `<p class="muted" style="margin:0 0 .4rem">${esc(impLabel(r))}</p>` : ''}
     <div class="stats">
       <div><div class="v">${fD(r.dist)} ${dU()}</div><div class="l">Distance</div></div>
       <div><div class="v">${fmtTime(r.moving)}</div><div class="l">Moving time</div></div>
       <div><div class="v">${fP(avgPaceKm(r.moving, r.dist))}</div><div class="l">Avg pace /${dU()}</div></div>
-      <div><div class="v">${toDispSpeed(r.maxSpeed).toFixed(1)}</div><div class="l">Top ${sU()}</div></div>
-      <div><div class="v">${r.climb} m</div><div class="l">Climb (${r.avgIncline}% avg)</div></div>
-      <div><div class="v">${r.kcal != null ? r.kcal : '–'}</div><div class="l">kcal${r.kcalSource === 'estimate' ? ' (est.)' : r.kcalSource === 'treadmill' ? ' (treadmill)' : ''}</div></div>
-      ${r.steps != null ? `<div><div class="v">${r.steps.toLocaleString('en-GB')}</div><div class="l">Steps (est.)</div></div><div><div class="v">${r.cadence || '–'}</div><div class="l">Avg steps/min</div></div>` : ''}
+      ${r.src ? '' : `<div><div class="v">${toDispSpeed(r.maxSpeed).toFixed(1)}</div><div class="l">Top ${sU()}</div></div>
+      <div><div class="v">${r.climb} m</div><div class="l">Climb (${r.avgIncline}% avg)</div></div>`}
+      <div><div class="v">${r.kcal != null ? r.kcal : '–'}</div><div class="l">kcal${r.kcalSource === 'estimate' ? ' (est.)' : r.kcalSource === 'treadmill' ? ' (treadmill)' : r.kcalSource === 'watch' ? ' (watch)' : ''}</div></div>
+      ${r.steps != null ? `<div><div class="v">${r.steps.toLocaleString('en-GB')}</div><div class="l">Steps${r.src ? '' : ' (est.)'}</div></div><div><div class="v">${r.cadence || '–'}</div><div class="l">Avg steps/min</div></div>` : ''}
       ${r.avgHr ? `<div><div class="v">${r.avgHr}</div><div class="l">Avg bpm</div></div><div><div class="v">${r.maxHr}</div><div class="l">Max bpm</div></div>` : ''}
     </div>
     <div class="chart">${runChart(r)}</div>
@@ -5911,7 +5938,7 @@ function openDetail(id){
     <div class="chips" id="dtags">${TAGS.map(t => `<button class="chip" data-t="${esc(t)}" aria-pressed="${tags.includes(t)}">${esc(t)}</button>`).join('')}</div>
     <label class="f"><span>Notes</span><textarea id="dnote" placeholder="How did it feel?">${esc(r.note || '')}</textarea></label>
     <div class="drow">
-      <button class="sm" id="dtcx">Export to Garmin Connect</button>
+      ${r.src ? '' : '<button class="sm" id="dtcx">Export to Garmin Connect</button>'}
       <button class="sm danger" id="ddel">Delete run</button>
       <button class="sm primary" id="dclose">Close</button>
     </div>`;
@@ -5923,7 +5950,7 @@ function openDetail(id){
   });
   d.querySelector('#dnote').addEventListener('input', e => updateRun(id, x => x.note = e.target.value));
   d.querySelector('#dclose').onclick = () => { d.close(); renderHistory(); };
-  d.querySelector('#dtcx').onclick = async e => {
+  if (d.querySelector('#dtcx')) d.querySelector('#dtcx').onclick = async e => {
     const btn = e.currentTarget, rec = allRuns().find(x => x.id === id), name = tcxName(rec);
     if (!window.mmFiles){
       download(name, buildTcx(rec), TCX_TYPE);
@@ -6657,7 +6684,8 @@ document.addEventListener('click', e => {
 // hand a few things to health.js and notify.js (Android app only)
 window.mmApp = { settings, saveSettings, store, toast, runs: () => store.get(KEY, []), profileName: () => curProfile().name,
   liveRun: () => run, live: () => live, computeStreak, allRuns, profileRuns, weekStart, dayKey, profiles, freezesPerWeek: FREEZES_PER_WEEK,
-  addWeighIns, wtFmt: kg => wtFmt(kg), fmtDate: t => fmtDate(t) };
+  addWeighIns, wtFmt: kg => wtFmt(kg), fmtDate: t => fmtDate(t),
+  addImportedRun, afterImport, updateRun, renderHistory, openDetail, fD, dU, unitM, fmtTime, fmtClock, esc, impLabel };
 window.dispatchEvent(new Event('mmapp-ready'));
 })();
 </script>

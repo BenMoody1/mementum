@@ -65,7 +65,7 @@
   }
 
   function onSaved(rec) {
-    if (!app || !H.on) return;
+    if (!app || !H.on || rec.src) return;
     send([rec]).then(function (r) {
       if (r.written) setTimeout(function () { app.toast('Sent to Health Connect'); }, 2200);
     }).catch(function (e) {
@@ -82,7 +82,8 @@
   // Also removes runs that were deleted on another device (household sync).
   function catchUp() {
     if (!H.on) return;
-    var done = synced(), since = H.since || 0, runs = app.runs();
+    // walks and runs brought in from Health Connect (src set) are already there, so never sent back
+    var done = synced(), since = H.since || 0, runs = app.runs().filter(function (r) { return !r.src; });
     var todo = runs.filter(function (r) { return r.date >= since && !done.has(r.id); });
     if (todo.length) send(todo).catch(function () {});
     var ids = new Set(runs.map(function (r) { return r.id; }));
@@ -182,7 +183,7 @@
       H.steps = ui.steps.checked; savePrefs();
     });
     ui.all.addEventListener('click', function () {
-      var runs = app.runs();
+      var runs = app.runs().filter(function (r) { return !r.src; });
       if (!runs.length) { app.toast('No runs to send yet'); return; }
       if (!confirm('Send all ' + runs.length + ' of ' + app.profileName() + '’s runs to Health Connect? Runs already there are updated, not duplicated.')) return;
       ui.all.disabled = true; ui.status.textContent = 'Sending ' + runs.length + ' runs…';
