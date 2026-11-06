@@ -135,7 +135,7 @@
 
   /* ---------- Settings section ---------- */
   function buildUi() {
-    var anchor = Array.prototype.filter.call(document.querySelectorAll('h3'), function (h) { return h.textContent.trim() === 'Devices and data'; })[0];
+    var anchor = document.getElementById('nSlot');   // its place on the Settings page
     if (!anchor || document.getElementById('nStreak')) return;
     var t = document.createElement('template');
     t.innerHTML = '<div id="nBox"><h3>Notifications</h3>' +

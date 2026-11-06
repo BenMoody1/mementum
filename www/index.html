@@ -13,6 +13,9 @@
 <script src="native.js"></script>
 <script src="health.js"></script>
 <script src="activities.js"></script>
+<script src="build-info.js"></script>
+<script src="settings-nav.js"></script>
+<script src="updates.js"></script>
 <script src="notify.js"></script>
 <style>
 :root{
@@ -390,8 +393,33 @@ nav.tabs button{padding:0 .15rem;font-size:.86rem}
 .lbnote p{margin:0 0 .6rem}
 .bknag{border-left:6px solid var(--warn);border-radius:0 14px 14px 0;margin-bottom:1rem}
 .bknag strong{display:block;margin-bottom:.3rem}
+.tsync{font:inherit;font-size:.78rem;font-weight:600;line-height:1;min-height:30px;padding:.3rem .55rem;margin-left:.35rem;border-radius:999px;border:1px solid currentColor;background:rgba(251,246,238,.16);color:inherit;cursor:pointer;vertical-align:middle}
+.tsync:active{background:rgba(251,246,238,.35)}
+.cell .l:has(.tsync),.gl-stats .l:has(.tsync){overflow:visible}
+/* settings: home list of categories, each opening its own page */
+.sp-list{display:flex;flex-direction:column;gap:.55rem;margin:.6rem 0 1rem}
+.sp-row{display:flex;align-items:center;gap:.9rem;width:100%;min-height:64px;padding:.75rem 1rem;text-align:left;font:inherit;color:var(--ink);background:var(--surface);border:1px solid var(--rule);border-radius:14px;cursor:pointer}
+.sp-row:active{background:var(--rule)}
+.sp-row:focus-visible,.sp-back:focus-visible{outline:3px solid var(--infield);outline-offset:2px}
+.sp-ic{font-size:1.45rem;width:1.8rem;text-align:center;flex:none}
+.sp-t{display:flex;flex-direction:column;gap:.1rem;flex:1;min-width:0}
+.sp-t strong{font-size:1.05rem}
+.sp-sum{color:var(--muted);font-size:.88rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sp-sum:empty{display:none}
+.sp-chev{color:var(--muted);font-size:1.6rem;line-height:1;flex:none}
+.sp-head{display:flex;align-items:center;gap:.4rem;margin:.2rem 0 .4rem;position:sticky;top:env(safe-area-inset-top,0px);background:var(--paper);z-index:5;padding:.2rem 0}
+.sp-head h2{margin:.3rem 0}
+.sp-back{font:inherit;font-size:2rem;line-height:1;width:44px;height:44px;flex:none;border:0;border-radius:50%;background:transparent;color:var(--ink);cursor:pointer}
+.sp-back:active{background:var(--rule)}
+.sp-page>h3:first-of-type,.sp-page .sp-slot+div>h3:first-child{margin-top:.6rem}
+.sp-page.sp-in{animation:sp-in .18s ease-out}
+@keyframes sp-in{from{transform:translateX(18px);opacity:0}}
+@media (prefers-reduced-motion:reduce){.sp-page.sp-in{animation:none}}
 .actnag{border-left:6px solid var(--infield);border-radius:0 14px 14px 0;margin-bottom:1rem}
 .actnag strong{display:block;margin-bottom:.3rem}
+.actdbl{border-left:6px solid var(--warn);border-radius:0 14px 14px 0;margin-bottom:1rem}
+.actdbl strong{display:block;margin-bottom:.3rem}
+.actdbl p{margin:.3rem 0}
 .actcard{margin:.7rem 0;border:1px solid var(--rule)}
 .actcard .actsrc{display:block;font-size:.88rem}
 .actcard .stats{margin:.6rem 0 .4rem}
@@ -798,7 +826,7 @@ body.picking{overflow:hidden}
     <div class="grid">
       <div class="cell"><div class="v" id="pace">–:––</div><div class="l" id="paceL">Pace /km</div></div>
       <div class="cell"><div class="v" id="speed">0.0</div><div class="l" id="speedL">km/h</div></div>
-      <div class="cell"><div class="v" id="time">0:00</div><div class="l">Time</div></div>
+      <div class="cell"><div class="v" id="time">0:00</div><div class="l">Time<button type="button" class="tsync" id="tmSync" hidden aria-label="Resync time and distance with the treadmill"></button></div></div>
       <div class="cell"><div class="v" id="incline">0.0</div><div class="l">Incline</div></div>
     </div>
     <div class="grid small">
@@ -965,25 +993,27 @@ body.picking{overflow:hidden}
 
 <!-- ================= SETTINGS ================= -->
 <section class="tab" id="tab-settings" hidden>
+  <div class="sp-home" id="spHome">
   <h2>Settings</h2>
-  <div class="field"><span class="flabel">Units</span>
-    <div class="seg" id="unitSeg"><button data-u="km">Kilometres</button><button data-u="mi">Miles</button></div>
+  <div class="sp-list">
+    <button type="button" class="sp-row" data-sp="you"><span class="sp-ic" aria-hidden="true">👤</span><span class="sp-t"><strong>You</strong><span class="sp-sum" id="spSum-you"></span></span><span class="sp-chev" aria-hidden="true">›</span></button>
+    <button type="button" class="sp-row" data-sp="run"><span class="sp-ic" aria-hidden="true">🏃</span><span class="sp-t"><strong>During a run</strong><span class="sp-sum" id="spSum-run"></span></span><span class="sp-chev" aria-hidden="true">›</span></button>
+    <button type="button" class="sp-row" data-sp="cel"><span class="sp-ic" aria-hidden="true">🎉</span><span class="sp-t"><strong>Celebrations</strong><span class="sp-sum" id="spSum-cel"></span></span><span class="sp-chev" aria-hidden="true">›</span></button>
+    <button type="button" class="sp-row" data-sp="notify"><span class="sp-ic" aria-hidden="true">🔔</span><span class="sp-t"><strong>Notifications</strong><span class="sp-sum" id="spSum-notify"></span></span><span class="sp-chev" aria-hidden="true">›</span></button>
+    <button type="button" class="sp-row" data-sp="health"><span class="sp-ic" aria-hidden="true">❤️</span><span class="sp-t"><strong>Health and fitness apps</strong><span class="sp-sum" id="spSum-health"></span></span><span class="sp-chev" aria-hidden="true">›</span></button>
+    <button type="button" class="sp-row" data-sp="devices"><span class="sp-ic" aria-hidden="true">📡</span><span class="sp-t"><strong>Devices</strong><span class="sp-sum" id="spSum-devices"></span></span><span class="sp-chev" aria-hidden="true">›</span></button>
+    <button type="button" class="sp-row" data-sp="data"><span class="sp-ic" aria-hidden="true">💾</span><span class="sp-t"><strong>Backup and sync</strong><span class="sp-sum" id="spSum-data"></span></span><span class="sp-chev" aria-hidden="true">›</span></button>
+    <button type="button" class="sp-row" data-sp="app"><span class="sp-ic" aria-hidden="true">🎨</span><span class="sp-t"><strong>Appearance and app</strong><span class="sp-sum" id="spSum-app"></span></span><span class="sp-chev" aria-hidden="true">›</span></button>
   </div>
-  <div class="field"><span class="flabel">Demo</span>
-    <span class="fhint">Try the app without a treadmill. A simulated run plays out on the Run tab, and demo runs are never saved.</span>
-    <div class="row"><button class="sm" id="demo">Try a demo</button></div>
   </div>
+
+  <div class="sp-page" id="sp-you" hidden>
+  <div class="sp-head"><button type="button" class="sp-back" aria-label="Back to all settings">‹</button><h2>You</h2></div>
   <div class="field"><span class="flabel">Profile</span>
     <div class="row"><button class="sm" id="manageProf">Manage profiles</button></div>
     <label class="check"><input type="checkbox" id="setWhoPick"><span>Ask who’s running when the app opens (with two or more profiles)</span></label>
     <span class="fhint">Each profile keeps its own runs, workouts, plan and settings.</span>
   </div>
-  <div class="field"><span class="flabel">Appearance</span>
-    <div class="seg" id="themeSeg"><button data-th="auto">Auto</button><button data-th="light">Light</button><button data-th="dark">Dark</button></div>
-  </div>
-  <div class="field"><span class="flabel">Live stats colour</span>
-    <div class="swatches" id="glColours" role="radiogroup" aria-label="Live stats colour"></div>
-    <span class="fhint">The background of the live stats panel and the big view. Each profile can pick their own.</span></div>
   <label class="field"><span class="flabel">Your weight (kg)</span>
     <input type="number" inputmode="decimal" id="setWeight" min="30" max="250" step="0.1" placeholder="e.g. 75">
     <span class="fhint">Used to estimate calories from your speed and incline. Leave blank to use the treadmill’s own figure.</span></label>
@@ -997,6 +1027,13 @@ body.picking{overflow:hidden}
     <input type="number" inputmode="decimal" id="setGoal" min="0" step="0.5">
     <span class="fhint">Set to 0 to turn the goal off.</span></label>
 
+  <div class="field"><span class="flabel">Units</span>
+    <div class="seg" id="unitSeg"><button data-u="km">Kilometres</button><button data-u="mi">Miles</button></div>
+  </div>
+  </div>
+
+  <div class="sp-page" id="sp-run" hidden>
+  <div class="sp-head"><button type="button" class="sp-back" aria-label="Back to all settings">‹</button><h2>During a run</h2></div>
   <h3>Workouts</h3>
   <label class="check"><input type="checkbox" id="setCountdown"><span>Show a visual countdown before each speed or incline change (arrows up the screen edges)</span></label>
   <label class="check"><input type="checkbox" id="setGhost"><span>Show a ghost of your personal best at the same workout or free-run target in the big view</span></label>
@@ -1009,7 +1046,24 @@ body.picking{overflow:hidden}
     <span class="fhint" id="voiceHint"></span></label>
   <button class="sm" id="testAudio">Test audio</button>
 
-  <h3>Celebrations</h3>
+  <h3>Treadmill control</h3>
+  <label class="check"><input type="checkbox" id="setControl"><span>Let workouts and the on-screen buttons change speed and incline</span></label>
+  <p class="fhint">The app never starts the belt. It only changes speed while you’re already running, and speaks each change. Keep the safety key clipped on.</p>
+  <button class="sm" id="testControl">Test control</button>
+  <p class="fhint" id="controlStatus"></p>
+
+  <h3>Starting and stopping</h3>
+  <p class="fhint">Recording starts by itself when the belt starts moving, and the clock pauses whenever the belt stops.</p>
+  <div class="field"><span class="flabel">Finish and save the run when the belt has stopped for</span>
+    <div class="seg" id="autoFinSeg"><button data-af="0">Never</button><button data-af="5">5 min</button><button data-af="10">10 min</button><button data-af="20">20 min</button></div>
+    <span class="fhint">Saves the run for you if you walk off and forget to tap Finish.</span>
+  </div>
+  <p class="fhint">If the app was away for a while mid-run and missed time, a ⟳ button appears next to Time. Tap it to add the missed time and distance back from the treadmill.</p>
+  </div>
+
+  <div class="sp-page" id="sp-cel" hidden>
+  <div class="sp-head"><button type="button" class="sp-back" aria-label="Back to all settings">‹</button><h2>Celebrations</h2></div>
+  <h3>Confetti</h3>
   <label class="check"><input type="checkbox" id="setConfetti"><span id="confettiLabel">Confetti explosion on each kilometre</span></label>
   <div class="field"><span class="flabel">Celebrations</span>
     <span class="fhint">Each time the app celebrates, it picks one of your ticked celebrations at random. Earning badges and medals unlocks more. Tap ▶ to preview the ones you’ve unlocked.</span>
@@ -1019,24 +1073,17 @@ body.picking{overflow:hidden}
   <div class="row"><button class="sm" id="testConfetti">Test confetti</button><button class="sm" id="testSuper">Test finish celebration</button></div>
   <label class="check"><input type="checkbox" id="setConfettiSound"><span>Play a sound with confetti</span></label>
   <label class="check"><input type="checkbox" id="setSummary"><span>Show a summary of last week when a new week starts</span></label>
-  <label class="check"><input type="checkbox" id="setWtTrack"><span>Track my weight (weekly weigh-ins on the Profile tab and in the reports)</span></label>
+  </div>
 
-  <h3>Treadmill control</h3>
-  <label class="check"><input type="checkbox" id="setControl"><span>Let workouts and the on-screen buttons change speed and incline</span></label>
-  <p class="fhint">The app never starts the belt. It only changes speed while you’re already running, and speaks each change. Keep the safety key clipped on.</p>
-  <button class="sm" id="testControl">Test control</button>
-  <p class="fhint" id="controlStatus"></p>
+  <div class="sp-page" id="sp-notify" hidden>
+  <div class="sp-head"><button type="button" class="sp-back" aria-label="Back to all settings">‹</button><h2>Notifications</h2></div>
+  <span class="sp-slot" id="nSlot"></span>
+  <p class="fhint sp-none">Notifications are available in the Android app.</p>
+  </div>
 
-  <h3>Backup</h3>
-  <p class="fhint" id="bkStatus"></p>
-  <p class="fhint">Your runs live in this browser only. Back up now and then, and before clearing Chrome’s data.</p>
-  <div class="row"><button class="sm" id="backup">Back up everything</button><button class="sm" id="restoreBtn">Restore from backup</button></div>
-  <input type="file" id="restoreFile" accept=".json,application/json" hidden>
-
-  <h3>App</h3>
-  <p class="fhint" id="appStatus">Install this page as an app for a home-screen icon and a full-screen view.</p>
-  <button class="sm" id="installBtn" hidden>Install app</button>
-
+  <div class="sp-page" id="sp-health" hidden>
+  <div class="sp-head"><button type="button" class="sp-back" aria-label="Back to all settings">‹</button><h2>Health and fitness apps</h2></div>
+  <span class="sp-slot" id="hcSlot"></span>
   <h3>Export to Garmin Connect</h3>
   <div class="field"><span class="flabel">After each run</span>
     <div class="seg" id="exportSeg"><button data-x="off">Off</button><button data-x="file">Save file</button><button data-x="share">Share</button></div>
@@ -1045,8 +1092,55 @@ body.picking{overflow:hidden}
   <p class="fhint">To add the run to Garmin Connect, upload the file on Garmin Connect’s Import Data page. If Garmin Connect is linked to Health Connect on your phone, Garmin can pass your data on from there.</p>
   <div class="row"><button class="sm" id="garminImport">Open Garmin Connect import</button></div>
 
-  <h3>Devices and data</h3>
-  <div class="row"><button class="sm" id="showSetup">Show setup checklist</button><button class="sm" id="forget">Forget saved devices</button><button class="sm danger" id="wipe">Delete all runs</button></div>
+  <h3>Weight</h3>
+  <label class="check"><input type="checkbox" id="setWtTrack"><span>Track my weight (weekly weigh-ins on the Profile tab and in the reports)</span></label>
+  </div>
+
+  <div class="sp-page" id="sp-devices" hidden>
+  <div class="sp-head"><button type="button" class="sp-back" aria-label="Back to all settings">‹</button><h2>Devices</h2></div>
+  <div class="row"><button class="sm primary" id="spConn">Connect treadmill or heart rate monitor</button></div>
+  <div class="row"><button class="sm" id="showSetup">Show setup checklist</button><button class="sm" id="forget">Forget saved devices</button></div>
+  </div>
+
+  <div class="sp-page" id="sp-data" hidden>
+  <div class="sp-head"><button type="button" class="sp-back" aria-label="Back to all settings">‹</button><h2>Backup and sync</h2></div>
+  <h3>Backup</h3>
+  <p class="fhint" id="bkStatus"></p>
+  <div class="field" id="autoBkField" hidden><span class="flabel">Automatic backup</span>
+    <div class="seg" id="autoBkSeg"><button data-ab="off">Off</button><button data-ab="weekly">Weekly</button><button data-ab="daily">Daily</button></div>
+    <span class="fhint" id="autoBkHint"></span>
+  </div>
+  <p class="fhint">Your runs live on this phone. Backups protect against a bad update or cleared app data; to survive losing the phone, copy a backup somewhere else now and then (Google Drive, say) or use household sync below.</p>
+  <div class="row"><button class="sm" id="backup">Back up everything</button><button class="sm" id="restoreBtn">Restore from backup</button></div>
+  <input type="file" id="restoreFile" accept=".json,application/json" hidden>
+
+  <span class="sp-slot" id="syncSlot"></span>
+  <h3>Delete runs</h3>
+  <p class="fhint">Removes every run from this profile. Back up first if you might want them back.</p>
+  <div class="row"><button class="sm danger" id="wipe">Delete all runs</button></div>
+  </div>
+
+  <div class="sp-page" id="sp-app" hidden>
+  <div class="sp-head"><button type="button" class="sp-back" aria-label="Back to all settings">‹</button><h2>Appearance and app</h2></div>
+  <div class="field"><span class="flabel">Appearance</span>
+    <div class="seg" id="themeSeg"><button data-th="auto">Auto</button><button data-th="light">Light</button><button data-th="dark">Dark</button></div>
+  </div>
+  <div class="field"><span class="flabel">Live stats colour</span>
+    <div class="swatches" id="glColours" role="radiogroup" aria-label="Live stats colour"></div>
+    <span class="fhint">The background of the live stats panel and the big view. Each profile can pick their own.</span></div>
+  <div class="field"><span class="flabel">Demo</span>
+    <span class="fhint">Try the app without a treadmill. A simulated run plays out on the Run tab, and demo runs are never saved.</span>
+    <div class="row"><button class="sm" id="demo">Try a demo</button></div>
+  </div>
+  <h3>Updates</h3>
+  <p class="fhint" id="updStatus">Updates are checked in the Android app.</p>
+  <label class="check" id="updAutoRow" hidden><input type="checkbox" id="updAuto"><span>Check for a new version when the app opens</span></label>
+  <div class="row" id="updRow" hidden><button class="sm" id="updCheck">Check now</button><button class="sm primary" id="updGet" hidden>Download update</button></div>
+  <h3>App</h3>
+  <p class="fhint" id="appStatus">Install this page as an app for a home-screen icon and a full-screen view.</p>
+  <button class="sm" id="installBtn" hidden>Install app</button>
+  </div>
+
 </section>
 </main>
 
@@ -1075,7 +1169,7 @@ body.picking{overflow:hidden}
     <div class="gl-side">
       <div class="gl-stats">
         <div><div class="v" id="glSpeed">0.0</div><div class="l" id="glSpeedL">km/h</div></div>
-        <div><div class="v" id="glTime">0:00</div><div class="l">Time</div></div>
+        <div><div class="v" id="glTime">0:00</div><div class="l">Time<button type="button" class="tsync" id="glSync" hidden aria-label="Resync time and distance with the treadmill"></button></div></div>
         <div><div class="v" id="glPaceS">–:––</div><div class="l" id="glPaceSU">Pace /km</div></div>
         <div><div class="v" id="glHr">–</div><div class="l" id="glHrL">bpm</div></div>
         <div><div class="v" id="glSteps">–</div><div class="l" id="glStepsL">Steps</div></div>
@@ -1243,7 +1337,7 @@ function rawSet(base, id, v){ const k = keyFor(base, id); if (isBig(base)) retur
 await bigStoreInit();
 // household sync: fetch other devices' changes before the app reads anything
 if (window.mmSync) await mmSync.boot({ bigGet, bigSet, bigDel, keyFor, profiles, saveProfiles, flush: () => idbPending });
-const settings = Object.assign({ glControls: true, freeTarget: 'none', ghost: true, confettiTheme: 'classic', voice: 'auto', height: null, muted: false, confettiSound: true, autoExport: 'off',  units: 'km', weight: null, maxHr: null, weeklyGoal: 0, announce: true, cues: true, control: false, theme: 'auto', weeklySummary: true, goalSet: false, unitsSet: false, setupDone: store.get(KEY, []).length > 0, confetti: !window.matchMedia('(prefers-reduced-motion: reduce)').matches }, store.get(SKEY, {}));
+const settings = Object.assign({ autoFinish: 10, glControls: true, freeTarget: 'none', ghost: true, confettiTheme: 'classic', voice: 'auto', height: null, muted: false, confettiSound: true, autoExport: 'off',  units: 'km', weight: null, maxHr: null, weeklyGoal: 0, announce: true, cues: true, control: false, theme: 'auto', weeklySummary: true, goalSet: false, unitsSet: false, setupDone: store.get(KEY, []).length > 0, confetti: !window.matchMedia('(prefers-reduced-motion: reduce)').matches }, store.get(SKEY, {}));
 // older versions defaulted the goal to 20 km without it ever being set; treat that as not set
 if (!settings.goalSet && settings.weeklyGoal === 20000) settings.weeklyGoal = 0;
 const saveSettings = () => store.set(SKEY, settings);
@@ -2124,7 +2218,8 @@ function onPpValue(e){
 function startRun(){
   run = { start: Date.now(), moving: 0, dist: 0, climb: 0, maxSpeed: 0, incSum: 0, kcal: 0, hasKcal: false, kcalEst: 0, steps: 0,
           hrSum: 0, hrT: 0, hrMax: 0, zones: [0, 0, 0, 0, 0], splitsKm: [], splitsMi: [], samples: [], track: [[0, 0]],
-          lastSample: -5, demo: isDemo, workoutName: null, workoutKind: null };
+          lastSample: -5, demo: isDemo, workoutName: null, workoutKind: null, gaps: [] };
+  pausedSince = null;
   lastDist = null; lastKcal = null; tmDist = false; lastSteps = null; lastElapsed = null;
   requestWake();
   run.freeTarget = getWorkout(selected) ? null : (settings.freeTarget || 'none'); run.freeDone = false;
@@ -2142,10 +2237,14 @@ function onData(r, now = performance.now()){
    * belt wasn't moving on both sides of it; otherwise the whole gap counts (up to 2 minutes). When the
    * treadmill sends its own elapsed-time counter, that's used instead, as it can't drift at all. */
   const gap = lastTs == null ? 0 : Math.max(0, (now - lastTs) / 1000), cap = wasMoving && live.speed > MOVING ? 120 : 3;
-  let dt = Math.min(gap, cap);
+  const bothMoving = wasMoving && live.speed > MOVING;
+  let dt = Math.min(gap, cap), lostT = bothMoving && gap > cap ? gap - cap : 0; // time the cap left out, kept for a resync
   if (r.elapsed != null){
     // whole seconds from the treadmill; they add up exactly over the run, however bunched the messages arrive
-    if (lastElapsed != null && lastTs != null && r.elapsed >= lastElapsed) dt = Math.min(r.elapsed - lastElapsed, cap);
+    if (lastElapsed != null && lastTs != null && r.elapsed >= lastElapsed){
+      const de = r.elapsed - lastElapsed;
+      dt = Math.min(de, cap); lostT = bothMoving && de > cap ? de - cap : 0;
+    }
     lastElapsed = r.elapsed;
   }
   lastTs = now;
@@ -2154,14 +2253,21 @@ function onData(r, now = performance.now()){
   if (!run && !needStop && live.speed > MOVING) startRun();
   if (run){
     const moving = live.speed > MOVING;
-    let d = 0;
+    let d = 0, lostD = 0;
     if (r.dist != null){
       tmDist = true;
-      if (lastDist != null){ const delta = r.dist - lastDist; if (delta >= 0 && delta < 200) d = delta; }
+      if (lastDist != null){
+        const delta = r.dist - lastDist;
+        if (delta >= 0 && delta < 200) d = delta;
+        else if (delta >= 200 && delta < 50000 && (lostT > 0 || bothMoving)) lostD = delta; // a jump after the app was away: held for a resync
+      }
       lastDist = r.dist;
     } else if (!tmDist && moving){
       d = live.speed / 3.6 * dt;
+      lostD = live.speed / 3.6 * lostT;
     }
+    if (!run.demo && (lostT >= 1 || lostD > 0) && run.gaps) run.gaps.push({ at: run.moving, dist: run.dist, c: moving ? dt : 0, t: lostT, d: lostD }); // c: the part of the gap that was counted
+    if (moving) pausedSince = null; else if (pausedSince == null) pausedSince = Date.now();
     if (moving){
       run.moving += dt; run.incSum += live.incline * dt;
       if (live.hr){
@@ -2202,6 +2308,54 @@ function onData(r, now = performance.now()){
   }
   renderLive();
 }
+
+/* ---------- resync with the treadmill ---------- */
+// When Android holds the app back for more than 2 minutes mid-run, the missed time (and any jump in
+// the treadmill's distance) is kept in run.gaps rather than guessed at. Resync adds it back where it
+// happened, so later samples, splits and best efforts shift along with it.
+const gapTotals = r => (r && r.gaps || []).reduce((a, g) => ({ t: a.t + g.t, d: a.d + g.d }), { t: 0, d: 0 });
+function splitsFromTrack(track, unit){
+  const out = [];
+  for (let j = 1; j < track.length; j++){
+    const [t0, d0] = track[j - 1], [t1, d1] = track[j];
+    while ((out.length + 1) * unit <= d1){
+      const target = (out.length + 1) * unit;
+      out.push(d1 === d0 || target <= d0 ? t1 : Math.round(t0 + (t1 - t0) * (target - d0) / (d1 - d0)));
+    }
+  }
+  return out;
+}
+function resyncRun(){
+  if (!run || !run.gaps || !run.gaps.length) return;
+  const tot = gapTotals(run);
+  run.gaps.slice().sort((a, b) => b.at - a.at).forEach(g => {
+    const i = run.track.findIndex(p => p[0] > g.at);
+    run.track = run.track.map(p => p[0] > g.at ? [p[0] + g.t, p[1] + g.d] : p);
+    run.track.splice(i < 0 ? run.track.length : i, 0, [g.at, g.dist], [g.at + (g.c || 0) + g.t, g.dist + g.d]);
+    run.samples.forEach(sm => { if (sm[0] > g.at){ sm[0] = Math.round(sm[0] + g.t); sm[4] = Math.round(sm[4] + g.d); } });
+  });
+  run.moving += tot.t; run.dist += tot.d; run.lastSample += tot.t;
+  run.incSum += live.incline * tot.t; run.climb += tot.d * Math.max(0, live.incline) / 100;
+  { const kpm = kcalRate(); if (kpm) run.kcalEst += kpm * tot.t / 60; }
+  if (!run.tmSteps && settings.height && tot.d > 0) run.steps += tot.d / stepLength(Math.max(live.speed, 3));
+  run.splitsKm = splitsFromTrack(run.track, 1000); run.splitsMi = splitsFromTrack(run.track, MI);
+  run.gaps = [];
+  if (!run.demo) store.set(DRAFT, toRecord(run));
+  toast(`Synced with the treadmill: +${fmtTime(tot.t)}${tot.d >= 10 ? `, +${fD(tot.d)} ${dU()}` : ''}`);
+  renderLive();
+}
+$('#tmSync').onclick = $('#glSync').onclick = resyncRun;
+
+/* ---------- auto-finish ---------- */
+let pausedSince = null;
+setInterval(() => {
+  const mins = +settings.autoFinish || 0;
+  if (!run || run.demo || !mins || pausedSince == null || live.speed > MOVING) return;
+  if (Date.now() - pausedSince < mins * 60000) return;
+  pausedSince = null;
+  toast(`The belt stopped ${mins} minutes ago, so your run was saved`);
+  finishRun();
+}, 15000);
 
 function announceSplit(arr){
   const n = arr.length, split = arr[n - 1] - (arr[n - 2] || 0);
@@ -2250,7 +2404,7 @@ function finishRun(){
   if (!savedId) liveBadges.clear();
   frExpanded = false; frKey = '';
   if (wasMoving){ needStop = true; if (controlAvailable()) gradualStop(10); }
-  if (savedId) openDetail(savedId);
+  if (savedId){ openDetail(savedId); setTimeout(autoBackupCheck, 15000); }
 }
 function discardRun(){
   if (!run) return;
@@ -2727,6 +2881,8 @@ function renderLive(){
   $('#speed').textContent = toDispSpeed(live.speed).toFixed(1);
   $('#speedL').textContent = sU();
   $('#time').textContent = fmtTime(r ? r.moving : 0);
+  { const g = gapTotals(r), show = !!r && !r.demo && (g.t >= 5 || g.d >= 10), lab = show ? `⟳ +${fmtTime(g.t)}` : '';
+    ['#tmSync', '#glSync'].forEach(sel => { const b = $(sel); if (b && (b.hidden !== !show || b.textContent !== lab)){ b.hidden = !show; b.textContent = lab; } }); }
   $('#incline').textContent = live.incline.toFixed(1);
   $('#avgpace').textContent = r ? fP(avgPaceKm(r.moving, r.dist)) : '–:––';
   $('#avgpaceL').textContent = `Avg /${dU()}`;
@@ -2739,7 +2895,7 @@ function renderLive(){
   $('#kcalL').textContent = 'kcal';
   const connected = !!ch || isDemo;
   $('#state').textContent = r
-    ? (live.speed > MOVING ? (r.demo ? 'Demo run in progress' : 'Recording') : 'Paused. Belt stopped')
+    ? (live.speed > MOVING ? (r.demo ? 'Demo run in progress' : 'Recording') : 'Paused. Belt stopped' + (!r.demo && +settings.autoFinish && pausedSince ? `. Saves in ${Math.max(1, Math.ceil((settings.autoFinish * 60000 - (Date.now() - pausedSince)) / 60000))} min` : ''))
     : connected ? 'Ready. Recording starts when the belt moves' : 'Connect your treadmill to start';
   $('#finish').hidden = !r; $('#discard').hidden = !r;
   $('#connOpen').hidden = !!ch || isDemo || !!r;
@@ -4164,7 +4320,7 @@ function renderStreakBox(st){
     <div class="cal-nav"><button class="sm" data-cal="prev" aria-label="Previous month"${calOff >= maxOff ? ' disabled' : ''}>‹</button><strong>${m.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })}</strong><button class="sm" data-cal="next" aria-label="Next month"${calOff <= 0 ? ' disabled' : ''}>›</button></div>
     <div class="cal">${cells}</div>
     <p class="stk-meta" style="margin:.6rem 0 0">Tap a day to show its runs below. Days with 10 minutes or more count towards your streak (walking too), and two freezes a week cover days you miss.</p>
-    <button class="sm" id="holBtn" style="margin-top:.7rem">🏖️ Plan a holiday</button></div>`;
+    <div class="row" style="margin:.7rem 0 0"><button class="sm" id="holBtn">🏖️ Plan a holiday</button>${window.mmActivities ? '<button class="sm" id="actBtn">⌚ Add Garmin walk</button>' : ''}</div></div>`;
 }
 
 function renderProfile(){
@@ -6044,10 +6200,47 @@ function exportCsv(){
   download('treadmill-runs.csv', lines.join('\n'), 'text/csv').catch(saveFailed);
 }
 const LASTBK = 'tm-lastbackup-v1', BKSNOOZE = 'tm-bksnooze-v1', DAY = 864e5;
-function backup(){
+function backupData(){
   const data = { app: 'treadmill-log', version: 3, exported: new Date().toISOString(), profiles: profiles.list, people: {},
     runs: allRuns(), workouts: customWorkouts(), settings, plan: activePlan() }; // single-profile fields kept for older versions
   profiles.list.forEach(x => { data.people[x.id] = { runs: rawGet(KEY, x.id, []), workouts: rawGet(WKEY, x.id, []), settings: rawGet(SKEY, x.id, {}), plan: rawGet(PKEY, x.id, null) }; });
+  return data;
+}
+/* Automatic backups (Android app): a full backup into Download/MeMentum when the app opens, daily or
+ * weekly, keeping the newest 8. Kept per device, as it's about this phone's storage. */
+const ABK = 'mm-autobk-v1';
+const autoBk = () => { try { return Object.assign({ mode: 'weekly', last: 0 }, JSON.parse(localStorage.getItem(ABK) || '{}')); } catch(e){ return { mode: 'weekly', last: 0 }; } };
+const setAutoBk = o => { try { localStorage.setItem(ABK, JSON.stringify(o)); } catch(e){} };
+const autoBkEvery = a => a.mode === 'daily' ? DAY : a.mode === 'weekly' ? 7 * DAY : 0;
+function autoBackupCheck(){
+  if (!window.mmFiles || !mmFiles.autoBackup || run) return;
+  const a = autoBk(), every = autoBkEvery(a);
+  if (!every || Date.now() - a.last < every || !totalRunsAllProfiles()) return;
+  a.last = Date.now(); setAutoBk(a); // noted first, so a failing save doesn't retry on every open
+  mmFiles.autoBackup(`mementum-auto-backup-${new Date().toISOString().slice(0, 10)}.json`, JSON.stringify(backupData())).then(r => {
+    try { localStorage.setItem(LASTBK, String(Date.now())); localStorage.removeItem(BKSNOOZE); } catch(e){}
+    a.failed = false; a.name = r.name; setAutoBk(a);
+    toast('Backed up automatically to Download/MeMentum');
+    renderBackupStatus(); renderAutoBk(); renderHistory();
+  }, () => { a.failed = true; a.last = Date.now() - every + DAY; setAutoBk(a); renderAutoBk(); }); // try again tomorrow
+}
+function renderAutoBk(){
+  const f = $('#autoBkField'); if (!f) return;
+  f.hidden = !(window.mmFiles && mmFiles.autoBackup);
+  const a = autoBk();
+  $$('#autoBkSeg button').forEach(b => b.setAttribute('aria-pressed', b.dataset.ab === a.mode));
+  $('#autoBkHint').textContent = a.mode === 'off' ? 'Off. Use the buttons below to back up by hand.'
+    : `Saves a backup into Download/MeMentum ${a.mode === 'daily' ? 'once a day' : 'once a week'} when you open the app, and keeps the newest 8.` +
+      (a.failed ? ' The last one couldn’t be saved, so it will try again tomorrow.' : a.last && a.name ? ` Last one: ${fmtDate(a.last)}.` : '');
+}
+$('#autoBkSeg').addEventListener('click', e => {
+  const b = e.target.closest('button[data-ab]'); if (!b) return;
+  const a = autoBk(); a.mode = b.dataset.ab; setAutoBk(a); renderAutoBk(); autoBackupCheck();
+});
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') setTimeout(autoBackupCheck, 3000); });
+setTimeout(autoBackupCheck, 8000);
+function backup(){
+  const data = backupData();
   const n = profiles.list.length, covers = `covering ${n} profile${n === 1 ? '' : 's'}`;
   download(`treadmill-log-backup-${new Date().toISOString().slice(0, 10)}.json`, JSON.stringify(data), 'application/json').then(r => {
     try { localStorage.setItem(LASTBK, String(Date.now())); localStorage.removeItem(BKSNOOZE); } catch(e){}
@@ -6150,6 +6343,8 @@ function renderSettings(){
   $('#setSummary').checked = settings.weeklySummary;
   $('#setWtTrack').checked = wtOn();
   $$('#themeSeg button').forEach(b => b.setAttribute('aria-pressed', b.dataset.th === settings.theme));
+  $$('#autoFinSeg button').forEach(b => b.setAttribute('aria-pressed', +b.dataset.af === (+settings.autoFinish || 0)));
+  renderAutoBk();
   $('#confettiLabel').textContent = `Confetti explosion on each ${isMi() ? 'mile' : 'kilometre'}`;
   $('#controlStatus').textContent = controlStatusText();
   renderSetup();
@@ -6165,7 +6360,7 @@ function showTab(t){
   $('#cogBtn').setAttribute('aria-pressed', t === 'settings');
   if (t === 'history') renderHistory();
   if (t === 'leaders') renderLeaders();
-  if (t === 'settings') renderSettings();
+  if (t === 'settings'){ renderSettings(); if (window.mmSettingsNav) mmSettingsNav.home(); }
   if (t === 'workouts') renderWorkouts();
   window.scrollTo(0, 0);
 }
@@ -6252,6 +6447,7 @@ $('#setup').addEventListener('click', e => {
   if (a === 'wo') return showTab('workouts');
   const target = { height: 'setHeight', units: 'unitSeg', weight: 'setWeight', maxhr: 'setMaxHr', goal: 'setGoal' }[a];
   showTab('settings');
+  if (window.mmSettingsNav) mmSettingsNav.showFor($('#' + target));
   setTimeout(() => { const el = $('#' + target); el.scrollIntoView({ block: 'center' }); if (el.focus) el.focus(); }, 60);
 });
 
@@ -6265,7 +6461,7 @@ function openHolidays(){
   const t = new Date(); t.setDate(t.getDate() + 1); const iso = t.toISOString().slice(0, 10);
   $('#holFrom').value = iso; $('#holTo').value = iso; renderHolidays(); $('#holDlg').showModal();
 }
-$('#streakBox').addEventListener('click', e => { if (e.target.closest('#holBtn')) openHolidays(); });
+$('#streakBox').addEventListener('click', e => { if (e.target.closest('#holBtn')) openHolidays(); else if (e.target.closest('#actBtn') && window.mmActivities) mmActivities.openOrEnable(); });
 $('#holAdd').onclick = () => {
   const a = $('#holFrom').value, b = $('#holTo').value;
   if (!a || !b){ toast('Pick the first and last day of your holiday'); return; }
@@ -6336,6 +6532,7 @@ $('#glMute').addEventListener('click', e => {
 $('#setSummary').onchange = e => { settings.weeklySummary = e.target.checked; saveSettings(); };
 // turning it off only hides weight tracking; weigh-ins are kept, so turning it back on brings them back
 $('#setWtTrack').onchange = e => { settings.wtTrack = e.target.checked; saveSettings(); renderWeight(); toast(e.target.checked ? 'Weight tracking on' : 'Weight tracking off. Your weigh-ins are kept.'); };
+$('#autoFinSeg').addEventListener('click', e => { const b = e.target.closest('button[data-af]'); if (b){ settings.autoFinish = +b.dataset.af; saveSettings(); renderSettings(); } });
 $('#themeSeg').addEventListener('click', e => { const b = e.target.closest('button[data-th]'); if (b){ settings.theme = b.dataset.th; saveSettings(); applyTheme(); renderSettings(); } });
 $('#lastWeekBtn').onclick = () => { const ws = weekStart(Date.now()); ws.setDate(ws.getDate() - 7); openSummary(ws); };
 $('#lastMonthBtn').onclick = () => openMonthly(1);

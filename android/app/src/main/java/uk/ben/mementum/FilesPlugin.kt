@@ -1,5 +1,6 @@
 package uk.ben.mementum
 
+import android.content.ContentUris
 import android.content.ContentValues
 import android.os.Build
 import android.os.Environment
@@ -24,6 +25,8 @@ class FilesPlugin : Plugin() {
     fun saveDownload(call: PluginCall) {
         val name = call.getString("name")?.trim().orEmpty()
         val data = call.getString("data")
+        // optional sub-folder of Download, e.g. "MeMentum" for automatic backups
+        val folder = call.getString("folder")?.trim().orEmpty().replace(Regex("[^A-Za-z0-9 _-]"), "")
         if (name.isEmpty() || data == null) { call.reject("No file to save"); return }
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) { call.reject("Needs Android 10 or newer"); return }
 
@@ -39,7 +42,8 @@ class FilesPlugin : Plugin() {
         val values = ContentValues().apply {
             put(MediaStore.MediaColumns.DISPLAY_NAME, name)
             put(MediaStore.MediaColumns.MIME_TYPE, mime)
-            put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS)
+            put(MediaStore.MediaColumns.RELATIVE_PATH,
+                if (folder.isEmpty()) Environment.DIRECTORY_DOWNLOADS else "${Environment.DIRECTORY_DOWNLOADS}/$folder")
             put(MediaStore.MediaColumns.IS_PENDING, 1)
         }
         val uri = try {
@@ -67,5 +71,40 @@ class FilesPlugin : Plugin() {
             try { resolver.delete(uri, null, null) } catch (ignored: Exception) {}
             call.reject(e.message ?: "Couldn't save the file")
         }
+    }
+
+    /**
+     * Deletes all but the newest `keep` files in Download/<folder> whose names start with `prefix`.
+     * Android only lets the app see and delete files it created itself, so anything else is left alone.
+     */
+    @PluginMethod
+    fun prune(call: PluginCall) {
+        val folder = call.getString("folder")?.trim().orEmpty().replace(Regex("[^A-Za-z0-9 _-]"), "")
+        val prefix = call.getString("prefix")?.trim().orEmpty()
+        val keep = maxOf(1, call.getInt("keep", 8) ?: 8)
+        val ret = JSObject()
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q || folder.isEmpty() || prefix.isEmpty()) {
+            ret.put("removed", 0); call.resolve(ret); return
+        }
+        val uri = MediaStore.Downloads.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
+        var removed = 0
+        try {
+            context.contentResolver.query(
+                uri, arrayOf(MediaStore.MediaColumns._ID),
+                "${MediaStore.MediaColumns.RELATIVE_PATH}=? AND ${MediaStore.MediaColumns.DISPLAY_NAME} LIKE ?",
+                arrayOf("${Environment.DIRECTORY_DOWNLOADS}/$folder/", "$prefix%"),
+                "${MediaStore.MediaColumns.DATE_ADDED} DESC"
+            )?.use { c ->
+                var i = 0
+                while (c.moveToNext()) {
+                    if (i++ < keep) continue
+                    try {
+                        if (context.contentResolver.delete(ContentUris.withAppendedId(uri, c.getLong(0)), null, null) > 0) removed++
+                    } catch (ignored: Exception) {}
+                }
+            }
+        } catch (ignored: Exception) {}
+        ret.put("removed", removed)
+        call.resolve(ret)
     }
 }

@@ -310,7 +310,17 @@
     });
   }
   window.mmFiles = {
-    save: function (name, text, type) { return saveToDownloads(new Blob([text], { type: type || 'application/octet-stream' }), name); }
+    save: function (name, text, type) { return saveToDownloads(new Blob([text], { type: type || 'application/octet-stream' }), name); },
+    // automatic backups: quietly into Download/MeMentum (no share sheet), keeping the newest 8
+    autoBackup: function (name, text) {
+      name = safeName(name);
+      return blobToBase64(new Blob([text], { type: 'application/json' })).then(function (data) {
+        return call('MeMentumFiles', 'saveDownload', { name: name, data: data, folder: 'MeMentum' });
+      }).then(function (r) {
+        call('MeMentumFiles', 'prune', { folder: 'MeMentum', prefix: 'mementum-auto-backup-', keep: 8 }).catch(function () {});
+        return { saved: 'downloads', name: (r && r.name) || name };
+      });
+    }
   };
   var origClick = HTMLAnchorElement.prototype.click;
   HTMLAnchorElement.prototype.click = function () {

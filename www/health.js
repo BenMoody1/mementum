@@ -129,7 +129,7 @@
   function el(html) { var t = document.createElement('template'); t.innerHTML = html.trim(); return t.content; }
 
   function buildUi() {
-    var anchor = Array.prototype.filter.call(document.querySelectorAll('h3'), function (h) { return h.textContent.trim() === 'Devices and data'; })[0];
+    var anchor = document.getElementById('hcSlot');   // its place on the Settings page
     if (!anchor || document.getElementById('hcOn')) return;
     anchor.parentNode.insertBefore(el(
       '<div id="hcBox">' +
@@ -227,6 +227,6 @@
     setTimeout(catchUp, 3000);
     setTimeout(function () { importWeights(false); }, 3500);
   }
-  window.mmHealth = { onSaved: onSaved, onDeleted: onDeleted };
+  window.mmHealth = { onSaved: onSaved, onDeleted: onDeleted, isOn: function () { return !!(H && H.on); } };
   if (window.mmApp) start(); else window.addEventListener('mmapp-ready', start, { once: true });
 })();

@@ -309,7 +309,7 @@
   }
   function buildUi() {
     var app = window.mmApp;
-    var anchor = Array.prototype.filter.call(document.querySelectorAll('h3'), function (h) { return h.textContent.trim() === 'Devices and data'; })[0];
+    var anchor = document.getElementById('syncSlot');   // its place on the Settings page
     if (!anchor || document.getElementById('syncBox')) return;
     var t = document.createElement('template');
     t.innerHTML = '<div id="syncBox"><h3>Sync across devices</h3>' +

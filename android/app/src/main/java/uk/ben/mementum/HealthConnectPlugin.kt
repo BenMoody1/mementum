@@ -7,7 +7,6 @@ import androidx.activity.result.ActivityResult
 import androidx.activity.result.ActivityResultLauncher
 import androidx.health.connect.client.HealthConnectClient
 import androidx.health.connect.client.PermissionController
-import androidx.health.connect.client.aggregate.AggregateMetric
 import androidx.health.connect.client.permission.HealthPermission
 import androidx.health.connect.client.records.ActiveCaloriesBurnedRecord
 import androidx.health.connect.client.records.DistanceRecord
@@ -18,9 +17,9 @@ import androidx.health.connect.client.records.Record
 import androidx.health.connect.client.records.SpeedRecord
 import androidx.health.connect.client.records.StepsRecord
 import androidx.health.connect.client.records.WeightRecord
+import androidx.health.connect.client.records.metadata.DataOrigin
 import androidx.health.connect.client.records.metadata.Device
 import androidx.health.connect.client.records.metadata.Metadata
-import androidx.health.connect.client.request.AggregateRequest
 import androidx.health.connect.client.request.ReadRecordsRequest
 import androidx.health.connect.client.time.TimeRangeFilter
 import androidx.health.connect.client.units.Energy
@@ -255,7 +254,7 @@ class HealthConnectPlugin : Plugin() {
      * Walks, runs and hikes other apps wrote to Health Connect after `since` (ms), newest first.
      * MeMentum's own runs are left out. Resolves { activities: [{ id, source, type, title, start,
      * end, distance (m), steps, avgHr, maxHr, kcal }] }. Totals come only from the app that recorded
-     * the session; any it didn't record, or whose permission was refused, are left out.
+     * the session; any it didn't record, or whose permission was refused, are left out (not 0).
      */
     @PluginMethod
     fun readActivities(call: PluginCall) {
@@ -285,12 +284,6 @@ class HealthConnectPlugin : Plugin() {
                 } while (!token.isNullOrEmpty() && pages < 10)
 
                 val can = { t: KClass<out Record> -> granted.contains(HealthPermission.getReadPermission(t)) }
-                val metrics = mutableSetOf<AggregateMetric<*>>()
-                if (can(DistanceRecord::class)) metrics += DistanceRecord.DISTANCE_TOTAL
-                if (can(StepsRecord::class)) metrics += StepsRecord.COUNT_TOTAL
-                if (can(HeartRateRecord::class)) { metrics += HeartRateRecord.BPM_AVG; metrics += HeartRateRecord.BPM_MAX }
-                if (can(ActiveCaloriesBurnedRecord::class)) metrics += ActiveCaloriesBurnedRecord.ACTIVE_CALORIES_TOTAL
-
                 val out = JSArray()
                 for (s in sessions.take(100)) {
                     val o = JSObject()
@@ -300,21 +293,38 @@ class HealthConnectPlugin : Plugin() {
                     o.put("title", s.title ?: "")
                     o.put("start", s.startTime.toEpochMilli())
                     o.put("end", s.endTime.toEpochMilli())
-                    if (metrics.isNotEmpty()) {
-                        try {
-                            val a = client().aggregate(AggregateRequest(
-                                metrics = metrics,
-                                timeRangeFilter = TimeRangeFilter.between(s.startTime, s.endTime),
-                                dataOriginFilter = setOf(s.metadata.dataOrigin)
-                            ))
-                            a[DistanceRecord.DISTANCE_TOTAL]?.let { o.put("distance", it.inMeters) }
-                            a[StepsRecord.COUNT_TOTAL]?.let { o.put("steps", it) }
-                            a[HeartRateRecord.BPM_AVG]?.let { o.put("avgHr", it) }
-                            a[HeartRateRecord.BPM_MAX]?.let { o.put("maxHr", it) }
-                            a[ActiveCaloriesBurnedRecord.ACTIVE_CALORIES_TOTAL]?.let { o.put("kcal", it.inKilocalories) }
-                        } catch (e: Exception) {
-                            Log.w(TAG, "Couldn't total activity ${s.metadata.id}", e)
+                    // Raw records from the same app, added up here. Health Connect's own totals follow
+                    // its data-source priority list and can leave the watch's figures out.
+                    val origin = setOf(s.metadata.dataOrigin)
+                    val win = TimeRangeFilter.between(s.startTime, s.endTime)
+                    // share of a record that falls inside the session, for records that run past it
+                    fun part(a: Instant, b: Instant): Double {
+                        val len = b.toEpochMilli() - a.toEpochMilli()
+                        if (len <= 0) return 1.0
+                        val ov = minOf(b, s.endTime).toEpochMilli() - maxOf(a, s.startTime).toEpochMilli()
+                        return (ov.toDouble() / len).coerceIn(0.0, 1.0)
+                    }
+                    try {
+                        if (can(DistanceRecord::class)) {
+                            val recs = readAll(DistanceRecord::class, win, origin)
+                            if (recs.isNotEmpty()) o.put("distance", recs.sumOf { it.distance.inMeters * part(it.startTime, it.endTime) })
                         }
+                        if (can(StepsRecord::class)) {
+                            val recs = readAll(StepsRecord::class, win, origin)
+                            if (recs.isNotEmpty()) o.put("steps", recs.sumOf { it.count * part(it.startTime, it.endTime) })
+                        }
+                        if (can(ActiveCaloriesBurnedRecord::class)) {
+                            val recs = readAll(ActiveCaloriesBurnedRecord::class, win, origin)
+                            if (recs.isNotEmpty()) o.put("kcal", recs.sumOf { it.energy.inKilocalories * part(it.startTime, it.endTime) })
+                        }
+                        if (can(HeartRateRecord::class)) {
+                            val bpm = readAll(HeartRateRecord::class, win, origin).flatMap { it.samples }
+                                .filter { !it.time.isBefore(s.startTime) && !it.time.isAfter(s.endTime) }
+                                .map { it.beatsPerMinute }
+                            if (bpm.isNotEmpty()) { o.put("avgHr", bpm.average()); o.put("maxHr", bpm.maxOrNull()) }
+                        }
+                    } catch (e: Exception) {
+                        Log.w(TAG, "Couldn't total activity ${s.metadata.id}", e)
                     }
                     out.put(o)
                 }
@@ -326,6 +336,22 @@ class HealthConnectPlugin : Plugin() {
                 call.reject(e.message ?: "Couldn't read activities from Health Connect")
             }
         }
+    }
+
+    private suspend fun <T : Record> readAll(type: KClass<T>, range: TimeRangeFilter, origin: Set<DataOrigin>): List<T> {
+        val out = mutableListOf<T>()
+        var token: String? = null
+        var pages = 0
+        do {
+            val res = client().readRecords(ReadRecordsRequest(
+                recordType = type, timeRangeFilter = range, dataOriginFilter = origin,
+                pageSize = 1000, pageToken = token
+            ))
+            out += res.records
+            token = res.pageToken
+            pages++
+        } while (!token.isNullOrEmpty() && pages < 10)
+        return out
     }
 
     @PluginMethod
