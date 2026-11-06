@@ -22,6 +22,10 @@ jobs:
           node-version: 22
           cache: npm
 
+      - name: Stamp the version into the app (used for the update check)
+        run: |
+          echo "window.MM_BUILD = { version: '$VERSION_NAME', code: $VERSION_CODE, repo: '$GITHUB_REPOSITORY' };" > www/build-info.js
+
       - name: Install Capacitor and copy web files into the Android project
         run: |
           npm ci
