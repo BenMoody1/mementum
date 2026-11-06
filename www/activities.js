@@ -59,7 +59,9 @@
 
   var inHistory = function (a) { return app.runs().some(function (r) { return r.hcId === a.id || r.hcMerged === a.id; }); };
   var decided = function (a) { return !!A.seen[a.id] || inHistory(a); };
-  var pending = function () { return list.filter(function (a) { return !decided(a); }); };
+  // walks the watch recorded during a MeMentum treadmill run aren't listed: the run already has them
+  var onTreadmill = function (a) { return app.runs().some(function (r) { return !r.src && ovl(a, r); }); };
+  var pending = function () { return list.filter(function (a) { return !decided(a) && !onTreadmill(a); }); };
   var dismissed = function () { return list.filter(function (a) { return A.seen[a.id] === 'dismissed'; }); };
 
   // a run already in history covering at least half of this activity (or the other way round)
