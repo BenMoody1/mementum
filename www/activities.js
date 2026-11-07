@@ -35,7 +35,7 @@
   function norm(a) {
     var dur = Math.max(1, Math.round((a.end - a.start) / 1000));
     return {
-      id: a.id, source: a.source, srcApp: SOURCES[a.source] || 'another app', type: a.type || 'walk',
+      id: a.id, source: a.source, srcApp: SOURCES[a.source] || 'another app', type: a.type || 'walk', title: String(a.title || '').trim().slice(0, 60),
       start: a.start, end: a.end, dur: dur, dist: a.distance != null ? Math.round(a.distance) : null,
       steps: a.steps ? Math.round(a.steps) : null, avgHr: a.avgHr ? Math.round(a.avgHr) : null,
       maxHr: a.maxHr ? Math.round(a.maxHr) : null, kcal: a.kcal ? Math.round(a.kcal) : null
@@ -113,7 +113,7 @@
       splitsKm: [], splitsMi: [], steps: a.steps,
       cadence: a.steps && a.dur > 30 ? Math.round(a.steps / (a.dur / 60)) : null,
       samples: [], best: {}, workout: null, workoutId: null, workoutDone: false, freeTarget: null, freeDone: false,
-      tags: [], note: '', src: 'hc', srcApp: a.srcApp, actType: a.type, hcId: a.id
+      tags: [], note: '', title: a.title || '', src: 'hc', srcApp: a.srcApp, actType: a.type, hcId: a.id
     };
   }
   function add(a) {
@@ -154,7 +154,7 @@
     var dup = opts.dismissed ? null : overlapOf(a);
     var noDist = a.dist == null, pace = a.dist > 20 ? app.fmtTime(a.dur / (a.dist / app.unitM())) : '–';
     var h = '<div class="lbnote actcard" data-id="' + esc(a.id) + '">' +
-      '<strong>' + TYPES[a.type] + ', ' + app.fmtDate(a.start) + ', ' + app.fmtClock(a.start) + '</strong>' +
+      '<strong>' + TYPES[a.type] + ', ' + app.fmtDate(a.start) + ', ' + app.fmtClock(a.start) + (a.title ? ', ' + esc(a.title) : '') + '</strong>' +
       '<span class="muted actsrc">From ' + esc(a.srcApp) + '</span>' +
       '<div class="stats">' +
         stat(noDist ? '–' : app.fD(a.dist) + ' ' + app.dU(), 'Distance') + stat(app.fmtTime(a.dur), 'Time') +
@@ -170,6 +170,7 @@
       h += '<div class="row"><button class="sm" data-a="restore">Restore</button></div>';
     } else if (a._edit) {
       h += '<div class="actedit">' +
+        '<label class="f actname"><span>Name</span><input data-f="title" maxlength="60" placeholder="e.g. Canal loop" value="' + esc(a.title || '') + '"></label>' +
         '<label class="f"><span>Type</span><select data-f="type">' + Object.keys(TYPES).map(function (k) {
           return '<option value="' + k + '"' + (k === a.type ? ' selected' : '') + '>' + TYPES[k] + '</option>';
         }).join('') + '</select></label>' +
@@ -223,6 +224,7 @@
     else if (act === 'editsave') {
       var t = c.querySelector('[data-f="type"]').value, v = parseFloat(c.querySelector('[data-f="dist"]').value);
       if (TYPES[t]) a.type = t;
+      a.title = c.querySelector('[data-f="title"]').value.trim().slice(0, 60);
       if (isFinite(v) && v >= 0) a.dist = Math.round(v * app.unitM());
       a._edit = false;
     }

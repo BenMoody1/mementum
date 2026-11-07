@@ -9,6 +9,10 @@
 <link rel="icon" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-192.png">
 <link href="fonts/fonts.css" rel="stylesheet">
+<style>html.mm-boot body>*:not(.whopick){visibility:hidden}</style>
+<script>/* hide the app until start-up decides whether "Who's running?" comes first, so it doesn't flash */
+document.documentElement.classList.add('mm-boot');
+setTimeout(function(){ document.documentElement.classList.remove('mm-boot'); }, 4000);</script>
 <script src="sync.js"></script>
 <script src="native.js"></script>
 <script src="health.js"></script>
@@ -417,6 +421,7 @@ nav.tabs button{padding:0 .15rem;font-size:.86rem}
 @media (prefers-reduced-motion:reduce){.sp-page.sp-in{animation:none}}
 .actnag{border-left:6px solid var(--infield);border-radius:0 14px 14px 0;margin-bottom:1rem}
 .actnag strong{display:block;margin-bottom:.3rem}
+.medmore{margin-top:.6rem}
 .actdbl{border-left:6px solid var(--warn);border-radius:0 14px 14px 0;margin-bottom:1rem}
 .actdbl strong{display:block;margin-bottom:.3rem}
 .actdbl p{margin:.3rem 0}
@@ -428,6 +433,7 @@ nav.tabs button{padding:0 .15rem;font-size:.86rem}
 .actbtns{justify-content:flex-end}
 .actdup{border-left:4px solid var(--warn);padding:.3rem .6rem;margin:.4rem 0;font-size:.9rem}
 .actedit{display:grid;grid-template-columns:1fr 1fr;gap:.6rem;margin:.4rem 0}
+.actedit .actname{grid-column:1/-1}
 #tab-leaders h3:first-of-type{margin-top:.8rem}
 .podium{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));align-items:end;gap:.5rem;margin:1.2rem 0 0;padding:0 .2rem}
 .pod{display:flex;flex-direction:column;align-items:center;min-width:0}
@@ -990,6 +996,7 @@ body.picking{overflow:hidden}
 </section>
 <div class="bdback" id="bdBack" hidden></div>
 <dialog id="badgeDlg" tabindex="-1"></dialog>
+<dialog id="medDlg" aria-labelledby="medDlgH"></dialog>
 
 <!-- ================= SETTINGS ================= -->
 <section class="tab" id="tab-settings" hidden>
@@ -4320,7 +4327,7 @@ function renderStreakBox(st){
     <div class="cal-nav"><button class="sm" data-cal="prev" aria-label="Previous month"${calOff >= maxOff ? ' disabled' : ''}>‹</button><strong>${m.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })}</strong><button class="sm" data-cal="next" aria-label="Next month"${calOff <= 0 ? ' disabled' : ''}>›</button></div>
     <div class="cal">${cells}</div>
     <p class="stk-meta" style="margin:.6rem 0 0">Tap a day to show its runs below. Days with 10 minutes or more count towards your streak (walking too), and two freezes a week cover days you miss.</p>
-    <div class="row" style="margin:.7rem 0 0"><button class="sm" id="holBtn">🏖️ Plan a holiday</button>${window.mmActivities ? '<button class="sm" id="actBtn">⌚ Add Garmin walk</button>' : ''}</div></div>`;
+    <div class="row" style="margin:.7rem 0 0"><button class="sm" id="holBtn">🏖️ Plan a holiday</button>${window.mmActivities ? '<button class="sm" id="actBtn">⌚ Add walk</button>' : ''}</div></div>`;
 }
 
 function renderProfile(){
@@ -4574,9 +4581,19 @@ function renderMedals(){
   $('#lbMedals').innerHTML = !res.length ? '<p class="muted">The first medals are awarded at midnight on Sunday.</p>'
     : `<div class="mrow head"><span></span><span>Runner</span><span class="mdot g" aria-label="Gold"></span><span class="mdot s" aria-label="Silver"></span><span class="mdot b" aria-label="Bronze"></span></div>`
       + rows.map(x => `<div class="mrow${x.p.id === profiles.current ? ' me' : ''}">${avatar(x.p)}<span class="mname">${esc(x.p.name)}</span><span class="mc">${x.c[0]}</span><span class="mc">${x.c[1]}</span><span class="mc">${x.c[2]}</span></div>`).join('')
-      + `<h4>Recent weeks</h4>${res.slice(0, 4).map(week).join('')}`
-      + (res.length > 4 ? `<details class="sect" data-sect="allweeks"${sectOpen('allweeks', false) ? ' open' : ''}><summary>Every week<span class="count">${res.length}</span></summary><div class="sbody">${res.slice(4).map(week).join('')}</div></details>` : '');
+      + `<h4>Latest week</h4>${week(res[0])}`
+      + (res.length > 1 ? `<button class="sm medmore" data-more="weeks">Show previous weeks (${res.length - 1})</button>` : '');
+  medMore.weeks = () => ({ title: 'Previous weeks', html: res.slice(1).map(week).join('') });
 }
+/* "Show previous weeks / challenges": the older results in their own window */
+const medMore = {};
+function openMedMore(kind){
+  const d = $('#medDlg'), m = medMore[kind] && medMore[kind](); if (!d || !m) return;
+  d.innerHTML = `<h3 id="medDlgH">${m.title}</h3><div class="medlist">${m.html}</div><div class="drow"><button class="sm primary" id="medClose">Close</button></div>`;
+  d.querySelector('#medClose').onclick = () => d.close();
+  d.showModal(); d.scrollTop = 0;
+}
+['#lbMedals', '#lbJMedals'].forEach(sel => { const box = $(sel); if (box) box.addEventListener('click', e => { const b = e.target.closest('.medmore'); if (b) openMedMore(b.dataset.more); }); });
 
 // journey medals: places in finished household challenges (only racers who reach the end get a medal)
 function journeyMedals(){
@@ -4597,8 +4614,9 @@ function renderJourneyMedals(){
     : !res.length ? '<p class="muted">No challenges finished yet. The first to the end of a challenge takes gold.</p>'
     : `<div class="mrow head"><span></span><span>Runner</span><span class="mdot g" aria-label="Gold"></span><span class="mdot s" aria-label="Silver"></span><span class="mdot b" aria-label="Bronze"></span></div>`
       + rows.map(x => `<div class="mrow${x.p.id === profiles.current ? ' me' : ''}">${avatar(x.p)}<span class="mname">${esc(x.p.name)}</span><span class="mc">${x.c[0]}</span><span class="mc">${x.c[1]}</span><span class="mc">${x.c[2]}</span></div>`).join('')
-      + `<h4>Recent challenges</h4>${res.slice(0, 4).map(race).join('')}`
-      + (res.length > 4 ? `<details class="sect" data-sect="allraces"${sectOpen('allraces', false) ? ' open' : ''}><summary>Every challenge<span class="count">${res.length}</span></summary><div class="sbody">${res.slice(4).map(race).join('')}</div></details>` : '');
+      + `<h4>Latest challenge</h4>${race(res[0])}`
+      + (res.length > 1 ? `<button class="sm medmore" data-more="races">Show previous challenges (${res.length - 1})</button>` : '');
+  medMore.races = () => ({ title: 'Previous challenges', html: res.slice(1).map(race).join('') });
 }
 
 /* ---------- badges ---------- */
@@ -5980,7 +5998,7 @@ function renderHistory(){
   const rowHtml = r => {
     const tags = (r.tags || []).map(t => `<span class="tagchip">${esc(t)}</span>`).join('');
     return `<li><button class="runrow" data-id="${esc(r.id)}">
-      <span class="rl"><span class="rd">${fmtDate(r.date)}</span><span class="rs">${fmtClock(r.date)}${r.workout ? ', ' + esc(r.workout) : r.src ? ', ' + esc(impLabel(r)) : ''}</span>${jm && jm.has(r.id) ? `<span class="rs jrow">🗺️ ${esc(jm.get(r.id).j.name)}${jm.get(r.id).finished ? ' 🏁' : jm.get(r.id).towns.length ? `, past ${esc(jm.get(r.id).towns[jm.get(r.id).towns.length - 1])}` : ''}</span>` : ''}${tags ? `<span class="tags">${tags}</span>` : ''}</span>
+      <span class="rl"><span class="rd">${fmtDate(r.date)}</span><span class="rs">${fmtClock(r.date)}${r.workout ? ', ' + esc(r.workout) : r.src ? ', ' + esc(r.title || impLabel(r)) : ''}</span>${jm && jm.has(r.id) ? `<span class="rs jrow">🗺️ ${esc(jm.get(r.id).j.name)}${jm.get(r.id).finished ? ' 🏁' : jm.get(r.id).towns.length ? `, past ${esc(jm.get(r.id).towns[jm.get(r.id).towns.length - 1])}` : ''}</span>` : ''}${tags ? `<span class="tags">${tags}</span>` : ''}</span>
       <span class="spark" aria-hidden="true">${sparkline(r)}</span>
       <span class="rr"><span class="rk">${fD(r.dist)} ${dU()}</span><span class="rp">${fmtTime(r.moving)}, ${fP(avgPaceKm(r.moving, r.dist))} /${dU()}</span>${r.steps ? `<span class="rp">${r.steps.toLocaleString('en-GB')} steps</span>` : ''}${r.avgHr ? `<span class="rp">${r.avgHr} bpm avg</span>` : ''}</span>
     </button></li>`;
@@ -6074,7 +6092,7 @@ function openDetail(id){
   d.innerHTML = `
     <h3>${fmtDate(r.date)}, ${fmtClock(r.date)}</h3>
     ${r.workout ? `<p class="muted" style="margin:0 0 .4rem">${esc(r.workout)}</p>` : ''}
-    ${r.src ? `<p class="muted" style="margin:0 0 .4rem">${esc(impLabel(r))}</p>` : ''}
+    ${r.src ? `<p class="muted" style="margin:0 0 .4rem">${r.title ? `<strong>${esc(r.title)}</strong>, ` : ''}${esc(impLabel(r))}</p>` : ''}
     <div class="stats">
       <div><div class="v">${fD(r.dist)} ${dU()}</div><div class="l">Distance</div></div>
       <div><div class="v">${fmtTime(r.moving)}</div><div class="l">Moving time</div></div>
@@ -6092,6 +6110,7 @@ function openDetail(id){
     ${rows ? `<h4>Splits</h4><table><thead><tr><th>${isMi() ? 'Mile' : 'Km'}</th><th>Split${best != null ? ' (fastest in green)' : ''}</th></tr></thead><tbody>${rows}</tbody></table>` : ''}
     <h4>Tags</h4>
     <div class="chips" id="dtags">${TAGS.map(t => `<button class="chip" data-t="${esc(t)}" aria-pressed="${tags.includes(t)}">${esc(t)}</button>`).join('')}</div>
+    ${r.src ? `<label class="f"><span>Name</span><input id="dname" maxlength="60" placeholder="e.g. Canal loop" value="${esc(r.title || '')}"></label>` : ''}
     <label class="f"><span>Notes</span><textarea id="dnote" placeholder="How did it feel?">${esc(r.note || '')}</textarea></label>
     <div class="drow">
       ${r.src ? '' : '<button class="sm" id="dtcx">Export to Garmin Connect</button>'}
@@ -6105,6 +6124,10 @@ function openDetail(id){
     renderHistory();
   });
   d.querySelector('#dnote').addEventListener('input', e => updateRun(id, x => x.note = e.target.value));
+  if (d.querySelector('#dname')){
+    d.querySelector('#dname').addEventListener('input', e => updateRun(id, x => x.title = e.target.value.trim()));
+    d.querySelector('#dname').addEventListener('change', () => renderHistory());
+  }
   d.querySelector('#dclose').onclick = () => { d.close(); renderHistory(); };
   if (d.querySelector('#dtcx')) d.querySelector('#dtcx').onclick = async e => {
     const btn = e.currentTarget, rec = allRuns().find(x => x.id === id), name = tcxName(rec);
@@ -6353,6 +6376,7 @@ function renderAll(){ renderProfile(); renderConn(); renderLive(); renderWorkout
 
 let curTab = 'run', backTab = 'run';
 function showTab(t){
+  const prevTab = curTab;
   if (t === 'settings' && curTab !== 'settings') backTab = curTab;
   curTab = t;
   $$('.tab').forEach(s => s.hidden = s.id !== 'tab-' + t);
@@ -6361,7 +6385,13 @@ function showTab(t){
   if (t === 'history') renderHistory();
   if (t === 'leaders') renderLeaders();
   if (t === 'settings'){ renderSettings(); if (window.mmSettingsNav) mmSettingsNav.home(); }
-  if (t === 'workouts') renderWorkouts();
+  if (t === 'workouts'){
+    if (prevTab !== 'workouts'){   // arriving: fold every section, so the page starts as a short list
+      ['fav', 'ready', 'custom', 'plans', 'plan', 'journey'].forEach(id => { touchedSects.add(id); openSects.delete(id); });
+      const jr = $('#jrSect'); if (jr) jr.open = false;
+    }
+    renderWorkouts();
+  }
   window.scrollTo(0, 0);
 }
 
@@ -6855,7 +6885,8 @@ applyTheme();
 renderAll();
 restoreDevices();
 { let just = 0; try { just = +sessionStorage.getItem(WPJUST) || 0; sessionStorage.removeItem(WPJUST); } catch(e){}
-  if (Date.now() - just > 20000 && !store.get(DRAFT, null)) openWhoPick(); }
+  if (Date.now() - just > 20000 && !store.get(DRAFT, null)) openWhoPick();
+  document.documentElement.classList.remove('mm-boot'); }
 whenPickerClosed(() => { setTimeout(() => { chNotify(); chCheck(); }, 2500); maybeWeeklySummary(); setTimeout(() => { if ($('#sumDlg').open) $('#sumDlg').addEventListener('close', () => setTimeout(maybeMonthly, 400), { once: true }); else maybeMonthly(); }, 1000); });
 renderBackupStatus();
 initBadgeSeen();
