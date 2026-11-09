@@ -4199,7 +4199,6 @@ function holidaySet(pid){
   return out;
 }
 function computeStreak(runs, nowT = Date.now(), pid = profiles.current){
-  runs = runs.filter(r => !r.src); // streaks count treadmill walks/runs only, not ones added from Health Connect
   const hol = holidaySet(pid);
   const mins = new Map();
   runs.forEach(r => { const k = dayKey(r.date); mins.set(k, (mins.get(k) || 0) + (r.moving || 0)); });
@@ -4352,7 +4351,7 @@ function renderStreakBox(st){
     <p class="stk-meta" style="margin:.2rem 0 0">Best: ${st.best} day${st.best === 1 ? '' : 's'}. Freezes left this week: ${st.freezesLeft ? '❄️'.repeat(st.freezesLeft) : 'none'}</p>
     <div class="cal-nav"><button class="sm" data-cal="prev" aria-label="Previous month"${calOff >= maxOff ? ' disabled' : ''}>‹</button><strong>${m.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })}</strong><button class="sm" data-cal="next" aria-label="Next month"${calOff <= 0 ? ' disabled' : ''}>›</button></div>
     <div class="cal">${cells}</div>
-    <p class="stk-meta" style="margin:.6rem 0 0">Tap a day to show its walks/runs below. Days with 10 minutes or more on the treadmill count towards ${who ? esc(who.name) + '’s' : 'your'} streak, and two freezes a week cover days ${who ? 'they miss' : 'you miss'}.</p>
+    <p class="stk-meta" style="margin:.6rem 0 0">Tap a day to show its walks/runs below. Days with 10 minutes or more, on the treadmill or from added walks, count towards ${who ? esc(who.name) + '’s' : 'your'} streak, and two freezes a week cover days ${who ? 'they miss' : 'you miss'}.</p>
     ${who ? '' : `<div class="row" style="margin:.7rem 0 0"><button class="sm" id="holBtn">🏖️ Plan a holiday</button>${window.mmActivities ? '<button class="sm" id="actBtn">⌚ Add walk</button>' : ''}</div>`}</div>`;
 }
 
@@ -4675,8 +4674,8 @@ const BADGES = [
   ['everest', 'Everest', 'Climb 8,849 m in total, the height of Everest', 'gold', '🏔️'],
   ['steps10k', '10,000 steps', 'Take 10,000 steps in one walk/run', 'silver', '🦶'],
   ['week3', 'Three a week', 'Walk or run three times in one week', 'bronze', '📅'],
-  ['streak4', 'Four-week streak', 'Walk or run on the treadmill every week for 4 weeks in a row', 'silver', '🔗'],
-  ['streak12', '12-week streak', 'Walk or run on the treadmill every week for 12 weeks in a row', 'gold', '🛡️'],
+  ['streak4', 'Four-week streak', 'Walk or run every week for 4 weeks in a row', 'silver', '🔗'],
+  ['streak12', '12-week streak', 'Walk or run every week for 12 weeks in a row', 'gold', '🛡️'],
   ['goal4', 'Goal getter', 'Hit your weekly goal 4 weeks in a row', 'silver', '🎯'],
   ['early', 'Early bird', 'Start a walk/run before 7am', 'bronze', '🌅'],
   ['night', 'Night owl', 'Start a walk/run after 9pm', 'bronze', '🦉'],
@@ -4710,8 +4709,8 @@ function computeBadges(pid, extra = []){
   const goal = ps.weeklyGoal || 0, got = {}, prog = {};
   const earn = (id, d) => { if (!got[id]) got[id] = d; };
   let tDist = 0, tTime = 0, tClimb = 0, nRuns = 0, nWo = 0, maxDist = 0, maxTime = 0, maxClimb = 0, maxSteps = 0;
-  const weeks = new Map(), tmWeeks = new Map(), best = { '1k': Infinity, '1mi': Infinity, '5k': Infinity, '10k': Infinity };
-  const streakTo = (key, test, m = weeks) => { let n = 0; const k = new Date(key); for (;;){ const w = m.get(k.getTime()); if (!w || !test(w)) break; n++; k.setDate(k.getDate() - 7); } return n; };
+  const weeks = new Map(), best = { '1k': Infinity, '1mi': Infinity, '5k': Infinity, '10k': Infinity };
+  const streakTo = (key, test) => { let n = 0; const k = new Date(key); for (;;){ const w = weeks.get(k.getTime()); if (!w || !test(w)) break; n++; k.setDate(k.getDate() - 7); } return n; };
   const presetIds = new Set(PRESETS.map(x => x.id)), presetsDone = new Set();
   runs.forEach(r => {
     if (r.beat) earn('giant', r.date);
@@ -4738,9 +4737,7 @@ function computeBadges(pid, extra = []){
     if ((r.climb || 0) >= 100) earn('climb100', d); if (tClimb >= 8849) earn('everest', d);
     if ((r.steps || 0) >= 10000) earn('steps10k', d);
     if (w.n >= 3) earn('week3', d);
-    // weekly streaks count treadmill walks/runs only
-    if (!r.src){ tmWeeks.set(wk, { n: (tmWeeks.get(wk) || { n: 0 }).n + 1 });
-      const st = streakTo(wk, x => x.n > 0, tmWeeks); if (st >= 4) earn('streak4', d); if (st >= 12) earn('streak12', d); }
+    const st = streakTo(wk, x => x.n > 0); if (st >= 4) earn('streak4', d); if (st >= 12) earn('streak12', d);
     if (goal > 0 && streakTo(wk, x => x.dist >= goal) >= 4) earn('goal4', d);
     if (hr < 7) earn('early', d); if (hr >= 21) earn('night', d);
     if (nWo >= 10) earn('wo10', d);
@@ -4785,7 +4782,7 @@ function computeBadges(pid, extra = []){
   if (stk.comeback) earn('comeback', stk.comeback);
   // Perfect week: every day Monday to Sunday has at least 10 minutes (the run in progress counts, so it can unlock live)
   const midnight = t => { const x = new Date(t); x.setHours(0, 0, 0, 0); return x.getTime(); };
-  const dayTot = new Map(); runs.filter(r => !r.src).forEach(r => { const k = midnight(r.date); dayTot.set(k, (dayTot.get(k) || 0) + r.moving); });
+  const dayTot = new Map(); runs.forEach(r => { const k = midnight(r.date); dayTot.set(k, (dayTot.get(k) || 0) + r.moving); });
   [...new Set([...dayTot.keys()].map(k => weekStart(k).getTime()))].sort((a, b) => a - b).forEach(ws => {
     const x = new Date(ws); let ok = true;
     for (let i = 0; i < 7; i++){ if ((dayTot.get(x.getTime()) || 0) < 600){ ok = false; break; } if (i < 6) x.setDate(x.getDate() + 1); }
