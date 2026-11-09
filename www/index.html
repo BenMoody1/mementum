@@ -422,6 +422,10 @@ nav.tabs button{padding:0 .15rem;font-size:.86rem}
 .actnag{border-left:6px solid var(--infield);border-radius:0 14px 14px 0;margin-bottom:1rem}
 .actnag strong{display:block;margin-bottom:.3rem}
 .medmore{margin-top:.6rem}
+.viewwho{display:flex;align-items:center;gap:.6rem;margin:0 0 .9rem}
+.viewwho span{font-weight:600}
+.viewwho select{flex:1;font:inherit;min-height:44px;padding:0 .6rem;border-radius:10px;border:1px solid var(--rule);background:var(--card,transparent);color:inherit}
+.viewnote{margin:-.4rem 0 .9rem}
 .actdbl{border-left:6px solid var(--warn);border-radius:0 14px 14px 0;margin-bottom:1rem}
 .actdbl strong{display:block;margin-bottom:.3rem}
 .actdbl p{margin:.3rem 0}
@@ -869,7 +873,7 @@ body.picking{overflow:hidden}
   <div class="actions" hidden>
     <button class="primary wide" id="connOpen">Connect treadmill</button>
     <button class="primary wide" id="finish" hidden>Finish and save</button>
-    <div class="subacts"><button class="link" id="demoStop" hidden>Stop demo</button><button class="link danger-link" id="discard" hidden>Discard this run</button></div>
+    <div class="subacts"><button class="link" id="demoStop" hidden>Stop demo</button><button class="link danger-link" id="discard" hidden>Discard this walk/run</button></div>
   </div>
   <div class="msg" id="msg" hidden></div>
   <div class="wocard">
@@ -900,7 +904,7 @@ body.picking{overflow:hidden}
 <section class="tab" id="tab-history" hidden>
   <h2 class="vh">Profile</h2>
   <div class="pcard" id="pcard"></div>
-  <div class="psub" id="psub" role="tablist" aria-label="Profile sections"><button data-p="over" role="tab">Overview</button><button data-p="runs" role="tab">Runs</button><button data-p="badges" role="tab">Badges</button><button data-p="patches" role="tab">Patches</button></div>
+  <div class="psub" id="psub" role="tablist" aria-label="Profile sections"><button data-p="over" role="tab">Overview</button><button data-p="runs" role="tab">Walks/runs</button><button data-p="badges" role="tab">Badges</button><button data-p="patches" role="tab">Patches</button></div>
   <div class="ppane" data-pane="over">
   <div id="bkNagH"></div>
   <div class="goalbox" id="goalbox"></div>
@@ -911,18 +915,19 @@ body.picking{overflow:hidden}
   <div class="chart" id="chart"></div>
   <div class="stats" id="totals"></div>
   <h3>Personal bests</h3>
-  <p class="fhint">Fastest efforts found anywhere inside your runs.</p>
+  <p class="fhint">Fastest efforts found anywhere inside your walks/runs.</p>
   <div class="stats two" id="pbs"></div>
   <div id="wtSect"><h3>Weight</h3>
   <div class="wtbox" id="wtBox"></div></div>
   </div>
   <div class="ppane" data-pane="runs">
+  <div id="viewWhoBox"></div>
   <div id="streakBox"></div>
-  <h3 id="runsHead">Runs</h3>
+  <h3 id="runsHead">Walks/runs</h3>
   <div class="chips" id="filters"></div>
   <div id="runs"></div>
-  <p class="muted" id="empty" hidden>No runs yet. Your runs appear here when you finish them.</p>
-  <div class="foot"><span>Tap a run for details, tags and exports.</span><button class="link" id="export">Export all as CSV</button></div>
+  <p class="muted" id="empty" hidden>No walks or runs yet. They appear here when you finish them.</p>
+  <div class="foot"><span>Tap a walk/run for details, tags and exports.</span><button class="link" id="export">Export all as CSV</button></div>
   </div>
   <div class="ppane" data-pane="badges">
   <p class="fhint" id="badgeCount"></p>
@@ -1019,7 +1024,7 @@ body.picking{overflow:hidden}
   <div class="field"><span class="flabel">Profile</span>
     <div class="row"><button class="sm" id="manageProf">Manage profiles</button></div>
     <label class="check"><input type="checkbox" id="setWhoPick"><span>Ask who’s running when the app opens (with two or more profiles)</span></label>
-    <span class="fhint">Each profile keeps its own runs, workouts, plan and settings.</span>
+    <span class="fhint">Each profile keeps its own walks/runs, workouts, plan and settings.</span>
   </div>
   <label class="field"><span class="flabel">Your weight (kg)</span>
     <input type="number" inputmode="decimal" id="setWeight" min="30" max="250" step="0.1" placeholder="e.g. 75">
@@ -1117,14 +1122,14 @@ body.picking{overflow:hidden}
     <div class="seg" id="autoBkSeg"><button data-ab="off">Off</button><button data-ab="weekly">Weekly</button><button data-ab="daily">Daily</button></div>
     <span class="fhint" id="autoBkHint"></span>
   </div>
-  <p class="fhint">Your runs live on this phone. Backups protect against a bad update or cleared app data; to survive losing the phone, copy a backup somewhere else now and then (Google Drive, say) or use household sync below.</p>
+  <p class="fhint">Your walks and runs live on this phone. Backups protect against a bad update or cleared app data; to survive losing the phone, copy a backup somewhere else now and then (Google Drive, say) or use household sync below.</p>
   <div class="row"><button class="sm" id="backup">Back up everything</button><button class="sm" id="restoreBtn">Restore from backup</button></div>
   <input type="file" id="restoreFile" accept=".json,application/json" hidden>
 
   <span class="sp-slot" id="syncSlot"></span>
-  <h3>Delete runs</h3>
-  <p class="fhint">Removes every run from this profile. Back up first if you might want them back.</p>
-  <div class="row"><button class="sm danger" id="wipe">Delete all runs</button></div>
+  <h3>Delete walks/runs</h3>
+  <p class="fhint">Removes every walk/run from this profile. Back up first if you might want them back.</p>
+  <div class="row"><button class="sm danger" id="wipe">Delete all walks/runs</button></div>
   </div>
 
   <div class="sp-page" id="sp-app" hidden>
@@ -2360,7 +2365,7 @@ setInterval(() => {
   if (!run || run.demo || !mins || pausedSince == null || live.speed > MOVING) return;
   if (Date.now() - pausedSince < mins * 60000) return;
   pausedSince = null;
-  toast(`The belt stopped ${mins} minutes ago, so your run was saved`);
+  toast(`The belt stopped ${mins} minutes ago, so your walk/run was saved`);
   finishRun();
 }, 15000);
 
@@ -2398,12 +2403,12 @@ function finishRun(){
   const wasMoving = live.speed > MOVING;
   let savedId = null;
   if (run.demo){ toast('Demo runs aren’t saved'); }
-  else if (run.dist < 50 && run.moving < 60){ toast('Run too short to save'); }
+  else if (run.dist < 50 && run.moving < 60){ toast('Walk/run too short to save'); }
   else {
     const rec = toRecord(run), runs = store.get(KEY, []), beat = raceBeat();
     if (beat){ rec.beat = beat; setTimeout(() => { showBadgeText(`You beat ${beat.name}’s best!`); toast(`🏆 You beat ${beat.name}’s best!`); }, 900); }
     runs.unshift(rec);
-    if (store.set(KEY, runs)){ toast('Run saved'); savedId = rec.id; exportAfterRun(rec); planCheck(rec); if (window.mmHealth) mmHealth.onSaved(rec); setTimeout(checkNewBadges, 2600); setTimeout(journeyCheck, 4600); setTimeout(chCheck, 7000); }
+    if (store.set(KEY, runs)){ toast('Walk/run saved'); savedId = rec.id; exportAfterRun(rec); planCheck(rec); if (window.mmHealth) mmHealth.onSaved(rec); setTimeout(checkNewBadges, 2600); setTimeout(journeyCheck, 4600); setTimeout(chCheck, 7000); }
     else toast('Couldn’t save: browser storage is full or blocked. Back up and delete old runs.');
   }
   store.del(DRAFT);
@@ -3495,14 +3500,14 @@ function openSummary(ws){
       <div><div class="v">${fD(dist, 1)} ${dU()}</div><div class="l">${inWeek.length} run${inWeek.length === 1 ? '' : 's'}</div></div>
       <div><div class="v">${fmtTime(time)}</div><div class="l">Time running</div></div>
       <div><div class="v">${fP(avgPaceKm(time, dist))}</div><div class="l">Avg pace /${dU()}</div></div>
-      <div><div class="v">${fD(longest.dist)} ${dU()}</div><div class="l">Longest run</div></div>
+      <div><div class="v">${fD(longest.dist)} ${dU()}</div><div class="l">Longest walk/run</div></div>
       ${inWeek.some(r => r.steps) ? `<div><div class="v">${inWeek.reduce((a, r) => a + (r.steps || 0), 0).toLocaleString('en-GB')}</div><div class="l">Steps (est.)</div></div>` : ''}
       <div><div class="v">${diff >= 0 ? '+' : '−'}${fD(Math.abs(diff), 1)}</div><div class="l">${dU()} vs week before</div></div>
     </div>
     ${goal ? `<p>${dist >= goal ? `<strong>Weekly goal met</strong> (${fD(goal, 1)} ${dU()}).` : `${fD(goal - dist, 1)} ${dU()} short of your ${fD(goal, 1)} ${dU()} goal.`}</p>` : ''}
     ${pbs.length ? `<h4>New personal bests</h4><ul class="sumlist">${pbs.map(x => `<li>${esc(x)}</li>`).join('')}</ul>` : ''}
     ${plan ? `<p>${planDone} training plan session${planDone === 1 ? '' : 's'} completed.</p>` : ''}`
-    : '<p class="muted">No runs logged that week.</p>'}
+    : '<p class="muted">No walks/runs logged that week.</p>'}
     ${jReportLine(start, end.getTime())}
     ${wtReportLine(start, end.getTime(), 'this week')}
     <div class="drow"><span></span><button class="sm primary" id="sumClose">Close</button></div>`;
@@ -4035,7 +4040,7 @@ function freeTimeline(){
     const gx = Math.min(GBW, Math.max(13, axis === 'd' ? xOf(gd) : xOf(t + diff))); ghostX = gx;
     svg += `<line x1="${gx.toFixed(1)}" x2="${gx.toFixed(1)}" y1="${GAY + 10}" y2="${GBASE}" stroke="#FBF6EE" stroke-opacity=".45" stroke-width="1.5" stroke-dasharray="3 3"/>`;
     svg += avatarSvg(gProf, +gx.toFixed(1), GAY, 9, 'glGhClip', .7, true) + `<circle cx="${gx.toFixed(1)}" cy="${GAY}" r="10" fill="none" stroke="#FBF6EE" stroke-opacity=".75" stroke-width="1.5" stroke-dasharray="3 2"/>`;
-    ghostTxt = hasT ? ghostLabel(gOwner, diff) : (Math.abs(diff) < 2 ? 'Level with last run' : diff > 0 ? `Last run ${fmtTime(diff)} ahead` : `${fmtTime(-diff)} ahead of last run`);
+    ghostTxt = hasT ? ghostLabel(gOwner, diff) : (Math.abs(diff) < 2 ? 'Level with last walk/run' : diff > 0 ? `Last walk/run ${fmtTime(diff)} ahead` : `${fmtTime(-diff)} ahead of last walk/run`);
   }
   // your marker with a ring showing how much of the target is left
   const R = 11.5, C = 2 * Math.PI * R, X = mx.toFixed(1), frac = !hasT || finished || !run ? 0 : 1 - Math.min(1, curV / ft.v);
@@ -4194,6 +4199,7 @@ function holidaySet(pid){
   return out;
 }
 function computeStreak(runs, nowT = Date.now(), pid = profiles.current){
+  runs = runs.filter(r => !r.src); // streaks count treadmill walks/runs only, not ones added from Health Connect
   const hol = holidaySet(pid);
   const mins = new Map();
   runs.forEach(r => { const k = dayKey(r.date); mins.set(k, (mins.get(k) || 0) + (r.moving || 0)); });
@@ -4287,7 +4293,7 @@ function refreshStreak(st){
   STK = st || computeStreak(allRuns());
   const f = $('#profFlame');
   f.hidden = !STK.current; f.textContent = `🔥 ${STK.current}`; f.classList.toggle('risk', !STK.todayActive);
-  f.setAttribute('aria-label', `${STK.current}-day streak${STK.todayActive ? ', today done' : ', run today to keep it'}`);
+  f.setAttribute('aria-label', `${STK.current}-day streak${STK.todayActive ? ', today done' : ', walk or run today to keep it'}`);
   const line = $('#streakLine');
   renderStkCard();
   line.textContent = STK.todayActive ? `🔥 Day ${STK.current} secured. See you tomorrow.`
@@ -4310,9 +4316,29 @@ function dayStreakCheck(){
 }
 let calOff = 0, calSel = null;
 // the runs recorded on the tapped calendar day
+/* Viewing another profile's walks/runs (Profile > Walks/runs): read-only. viewPid is null for your own. */
+let viewPid = null;
+const viewingPid = () => viewPid && viewPid !== profiles.current && profiles.list.some(x => x.id === viewPid) ? viewPid : null;
+const viewRuns = () => { const v = viewingPid(); return v ? profileRuns(v) : allRuns(); };
+const viewStreak = () => { const v = viewingPid(); return v ? computeStreak(profileRuns(v), undefined, v) : computeStreak(allRuns()); };
+function renderViewWho(){
+  const box = $('#viewWhoBox'); if (!box) return;
+  if (profiles.list.length < 2){ box.innerHTML = ''; return; }
+  const v = viewingPid() || profiles.current, other = viewingPid() && profiles.list.find(x => x.id === v);
+  box.innerHTML = `<label class="viewwho"><span>Showing</span><select id="viewWho" aria-label="Whose walks and runs to show">${profiles.list.map(x =>
+    `<option value="${esc(x.id)}"${x.id === v ? ' selected' : ''}>${esc(x.name)}${x.id === profiles.current ? ' (you)' : ''}</option>`).join('')}</select></label>`
+    + (other ? `<p class="fhint viewnote">You’re looking at ${esc(other.name)}’s walks and runs. You can view them, but only ${esc(other.name)} can change them.</p>` : '');
+}
+$('#viewWhoBox').addEventListener('change', e => {
+  if (e.target.id !== 'viewWho') return;
+  viewPid = e.target.value === profiles.current ? null : e.target.value;
+  calSel = null; calOff = 0; filterTag = null;
+  renderHistory();
+});
 function renderStreakBox(st){
   const now = new Date(), m = new Date(now.getFullYear(), now.getMonth() - calOff, 1), today = dayKey(Date.now());
-  const runs = allRuns(), first = runs.length ? new Date(Math.min(...runs.map(r => r.date))) : now;
+  const vp = viewingPid(), who = vp && profiles.list.find(x => x.id === vp);
+  const runs = viewRuns(), first = runs.length ? new Date(Math.min(...runs.map(r => r.date))) : now;
   const maxOff = (now.getFullYear() - first.getFullYear()) * 12 + now.getMonth() - first.getMonth();
   const pad = (m.getDay() + 6) % 7, days = new Date(m.getFullYear(), m.getMonth() + 1, 0).getDate();
   let cells = ['M', 'T', 'W', 'T', 'F', 'S', 'S'].map(x => `<span class="cal-h" aria-hidden="true">${x}</span>`).join('') + '<span></span>'.repeat(pad);
@@ -4326,8 +4352,8 @@ function renderStreakBox(st){
     <p class="stk-meta" style="margin:.2rem 0 0">Best: ${st.best} day${st.best === 1 ? '' : 's'}. Freezes left this week: ${st.freezesLeft ? '❄️'.repeat(st.freezesLeft) : 'none'}</p>
     <div class="cal-nav"><button class="sm" data-cal="prev" aria-label="Previous month"${calOff >= maxOff ? ' disabled' : ''}>‹</button><strong>${m.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })}</strong><button class="sm" data-cal="next" aria-label="Next month"${calOff <= 0 ? ' disabled' : ''}>›</button></div>
     <div class="cal">${cells}</div>
-    <p class="stk-meta" style="margin:.6rem 0 0">Tap a day to show its runs below. Days with 10 minutes or more count towards your streak (walking too), and two freezes a week cover days you miss.</p>
-    <div class="row" style="margin:.7rem 0 0"><button class="sm" id="holBtn">🏖️ Plan a holiday</button>${window.mmActivities ? '<button class="sm" id="actBtn">⌚ Add walk</button>' : ''}</div></div>`;
+    <p class="stk-meta" style="margin:.6rem 0 0">Tap a day to show its walks/runs below. Days with 10 minutes or more on the treadmill count towards ${who ? esc(who.name) + '’s' : 'your'} streak, and two freezes a week cover days ${who ? 'they miss' : 'you miss'}.</p>
+    ${who ? '' : `<div class="row" style="margin:.7rem 0 0"><button class="sm" id="holBtn">🏖️ Plan a holiday</button>${window.mmActivities ? '<button class="sm" id="actBtn">⌚ Add walk</button>' : ''}</div>`}</div>`;
 }
 
 function renderProfile(){
@@ -4340,7 +4366,7 @@ function renderProfile(){
 function openProfiles(){
   const d = $('#profDlg');
   d.innerHTML = `<h3>Profiles</h3>
-    <p class="fhint">Each profile has its own runs, workouts, training plan and settings. Connected devices are shared.</p>
+    <p class="fhint">Each profile has its own walks/runs, workouts, training plan and settings. Connected devices are shared.</p>
     <ul class="plist">${profiles.list.map(x => `<li class="prow${x.id === profiles.current ? ' cur' : ''}">
       ${avatar(x)}
       <button class="pswitch" data-sw="${esc(x.id)}"><span class="pname">${esc(x.name)}</span><span class="wsum">${x.id === profiles.current ? 'Current profile' : 'Tap to switch'}</span></button>
@@ -4513,7 +4539,7 @@ function renderLeaders(){
       <div class="pod-block" aria-hidden="true">${place}</div></div>`;
   }).join('');
   const anyRuns = ranked.some(x => x.wkDist > 0);
-  $('#podNote').textContent = !anyRuns ? (lbMode === 'all' ? 'No runs yet.' : lbWeek === 0 ? 'No runs this week yet. The first to run takes the top spot.' : 'No runs that week.')
+  $('#podNote').textContent = !anyRuns ? (lbMode === 'all' ? 'No walks/runs yet.' : lbWeek === 0 ? 'No runs this week yet. The first to run takes the top spot.' : 'No walks/runs that week.')
     : lbMode === 'all' ? 'All-time distance. Tap a photo on the podium.'
     : lbWeek === 0 ? `Medals are awarded at midnight on Sunday, in ${untilMedals()}. Tap a photo on the podium.`
     : 'Final standings: medals awarded. Tap a photo on the podium.';
@@ -4621,11 +4647,11 @@ function renderJourneyMedals(){
 
 /* ---------- badges ---------- */
 const BADGES = [
-  ['first', 'First steps', 'Finish your first run', 'bronze', '👟'],
-  ['d5', '5K finisher', 'Run 5 km in one go', 'bronze', '🏃'],
-  ['d10', '10K club', 'Run 10 km in one go', 'silver', '🎽'],
-  ['d21', 'Half marathon', 'Run 21.1 km in one go', 'gold', '🏅'],
-  ['d42', 'Marathon', 'Run 42.2 km in one go', 'special', '🏆'],
+  ['first', 'First steps', 'Finish your first walk/run', 'bronze', '👟'],
+  ['d5', '5K finisher', 'Walk or run 5 km in one go', 'bronze', '🏃'],
+  ['d10', '10K club', 'Walk or run 10 km in one go', 'silver', '🎽'],
+  ['d21', 'Half marathon', 'Walk or run 21.1 km in one go', 'gold', '🏅'],
+  ['d42', 'Marathon', 'Walk or run 42.2 km in one go', 'special', '🏆'],
   ['k5_30', '5K under 30', 'Run 5 km in under 30 minutes', 'bronze', '⚡'],
   ['k5_25', '5K under 25', 'Run 5 km in under 25 minutes', 'silver', '⚡'],
   ['k5_20', '5K under 20', 'Run 5 km in under 20 minutes', 'gold', '🌩️'],
@@ -4633,33 +4659,33 @@ const BADGES = [
   ['k10_50', '10K under 50', 'Run 10 km in under 50 minutes', 'gold', '☄️'],
   ['mi8', 'Mile under 8', 'Run a mile in under 8 minutes', 'bronze', '🐇'],
   ['mi7', 'Mile under 7', 'Run a mile in under 7 minutes', 'silver', '🐆'],
-  ['t50', '50 km total', 'Run 50 km in total', 'bronze', '🛣️'],
-  ['t100', 'Century', 'Run 100 km in total', 'silver', '💯'],
-  ['t250', '250 km total', 'Run 250 km in total', 'silver', '🧭'],
-  ['t500', '500 km total', 'Run 500 km in total', 'gold', '🚀'],
-  ['t1000', '1,000 km club', 'Run 1,000 km in total', 'special', '🌍'],
-  ['c10', '10 runs', 'Log 10 runs', 'bronze', '🔁'],
-  ['c25', '25 runs', 'Log 25 runs', 'silver', '🗓️'],
-  ['c50', '50 runs', 'Log 50 runs', 'gold', '🎉'],
-  ['c100', '100 runs', 'Log 100 runs', 'special', '💎'],
-  ['h1', 'Hour of power', 'Run for an hour in one go', 'silver', '⏱️'],
-  ['th10', '10 hours', 'Spend 10 hours running in total', 'bronze', '⌛'],
-  ['th50', '50 hours', 'Spend 50 hours running in total', 'gold', '🕰️'],
-  ['climb100', 'Hill climber', 'Climb 100 m in one run', 'bronze', '⛰️'],
+  ['t50', '50 km total', 'Walk or run 50 km in total', 'bronze', '🛣️'],
+  ['t100', 'Century', 'Walk or run 100 km in total', 'silver', '💯'],
+  ['t250', '250 km total', 'Walk or run 250 km in total', 'silver', '🧭'],
+  ['t500', '500 km total', 'Walk or run 500 km in total', 'gold', '🚀'],
+  ['t1000', '1,000 km club', 'Walk or run 1,000 km in total', 'special', '🌍'],
+  ['c10', '10 walks/runs', 'Log 10 walks/runs', 'bronze', '🔁'],
+  ['c25', '25 walks/runs', 'Log 25 walks/runs', 'silver', '🗓️'],
+  ['c50', '50 walks/runs', 'Log 50 walks/runs', 'gold', '🎉'],
+  ['c100', '100 walks/runs', 'Log 100 walks/runs', 'special', '💎'],
+  ['h1', 'Hour of power', 'Walk or run for an hour in one go', 'silver', '⏱️'],
+  ['th10', '10 hours', 'Spend 10 hours walking or running in total', 'bronze', '⌛'],
+  ['th50', '50 hours', 'Spend 50 hours walking or running in total', 'gold', '🕰️'],
+  ['climb100', 'Hill climber', 'Climb 100 m in one walk/run', 'bronze', '⛰️'],
   ['everest', 'Everest', 'Climb 8,849 m in total, the height of Everest', 'gold', '🏔️'],
-  ['steps10k', '10,000 steps', 'Take 10,000 steps in one run', 'silver', '🦶'],
-  ['week3', 'Three a week', 'Run three times in one week', 'bronze', '📅'],
-  ['streak4', 'Four-week streak', 'Run every week for 4 weeks in a row', 'silver', '🔗'],
-  ['streak12', '12-week streak', 'Run every week for 12 weeks in a row', 'gold', '🛡️'],
+  ['steps10k', '10,000 steps', 'Take 10,000 steps in one walk/run', 'silver', '🦶'],
+  ['week3', 'Three a week', 'Walk or run three times in one week', 'bronze', '📅'],
+  ['streak4', 'Four-week streak', 'Walk or run on the treadmill every week for 4 weeks in a row', 'silver', '🔗'],
+  ['streak12', '12-week streak', 'Walk or run on the treadmill every week for 12 weeks in a row', 'gold', '🛡️'],
   ['goal4', 'Goal getter', 'Hit your weekly goal 4 weeks in a row', 'silver', '🎯'],
-  ['early', 'Early bird', 'Start a run before 7am', 'bronze', '🌅'],
-  ['night', 'Night owl', 'Start a run after 9pm', 'bronze', '🦉'],
-  ['wo10', 'Workout warrior', 'Finish 10 runs with a workout', 'bronze', '💪'],
+  ['early', 'Early bird', 'Start a walk/run before 7am', 'bronze', '🌅'],
+  ['night', 'Night owl', 'Start a walk/run after 9pm', 'bronze', '🦉'],
+  ['wo10', 'Workout warrior', 'Finish 10 walks/runs with a workout', 'bronze', '💪'],
   ['plan', 'Plan complete', 'Finish a whole training plan', 'gold', '📋'],
   ['gold1', 'Champion', 'Win a weekly gold medal', 'gold', '🥇'],
   ['pod5', 'Podium regular', 'Finish in the top three in 5 weeks', 'silver', '🎖️'],
   ['gold5', 'Dynasty', 'Win 5 weekly gold medals', 'special', '👑'],
-  ['losing5', 'Losing Streak', 'Run in 5 weeks in a row without finishing first', 'poo', '💩'],
+  ['losing5', 'Losing Streak', 'Walk or run in 5 weeks in a row without finishing first', 'poo', '💩'],
   ['plans3', 'Plan master', 'Finish all three training plans', 'special', '🎓'],
   ['presets', 'Workout completionist', 'Finish every ready-made workout', 'special', '🧩'],
   ['day7', 'Week on fire', 'Keep a daily streak going for 7 days', 'bronze', '🔥'],
@@ -4671,11 +4697,12 @@ const BADGES = [
   ['explorer', 'Workout explorer', 'Finish any ready-made workout', 'bronze', '🎒'],
   ['giant', 'Giant killer', 'Beat a family member’s best while racing their ghost', 'gold', '🗡️'],
   ['perfectweek', 'Perfect week', 'Be active for 10 minutes every day from Monday to Sunday, with no freezes', 'gold', '🌟'],
-  ['jfirst', 'First journey', 'Finish any virtual journey', 'bronze', '🧭'],
+  ['jfirst', 'First journey', 'Finish any virtual journey, on your own or in a challenge', 'bronze', '🧭'],
   ['j5', 'Seasoned traveller', 'Finish 5 different virtual journeys', 'gold', '🗺️'],
   ['chdone', 'Worthy rival', 'Finish a household challenge', 'bronze', '🤝'],
   ['chwin', 'Challenge champion', 'Win a household challenge', 'gold', '🥊'],
-  ['jall', 'Grand tour', 'Finish every virtual journey', 'special', '🎒']
+  ['jall', 'Grand tour', 'Finish every virtual journey', 'special', '🎒'],
+  ['lonewolf', 'Lone Wolf', 'Finish a virtual journey on your own, outside a household challenge', 'silver', '🐺']
 ].map(([id, name, desc, tier, icon]) => ({ id, name, desc, tier, icon }));
 function computeBadges(pid, extra = []){
   const runs = profileRuns(pid).concat(extra).sort((a, b) => a.date - b.date);
@@ -4683,8 +4710,8 @@ function computeBadges(pid, extra = []){
   const goal = ps.weeklyGoal || 0, got = {}, prog = {};
   const earn = (id, d) => { if (!got[id]) got[id] = d; };
   let tDist = 0, tTime = 0, tClimb = 0, nRuns = 0, nWo = 0, maxDist = 0, maxTime = 0, maxClimb = 0, maxSteps = 0;
-  const weeks = new Map(), best = { '1k': Infinity, '1mi': Infinity, '5k': Infinity, '10k': Infinity };
-  const streakTo = (key, test) => { let n = 0; const k = new Date(key); for (;;){ const w = weeks.get(k.getTime()); if (!w || !test(w)) break; n++; k.setDate(k.getDate() - 7); } return n; };
+  const weeks = new Map(), tmWeeks = new Map(), best = { '1k': Infinity, '1mi': Infinity, '5k': Infinity, '10k': Infinity };
+  const streakTo = (key, test, m = weeks) => { let n = 0; const k = new Date(key); for (;;){ const w = m.get(k.getTime()); if (!w || !test(w)) break; n++; k.setDate(k.getDate() - 7); } return n; };
   const presetIds = new Set(PRESETS.map(x => x.id)), presetsDone = new Set();
   runs.forEach(r => {
     if (r.beat) earn('giant', r.date);
@@ -4711,7 +4738,9 @@ function computeBadges(pid, extra = []){
     if ((r.climb || 0) >= 100) earn('climb100', d); if (tClimb >= 8849) earn('everest', d);
     if ((r.steps || 0) >= 10000) earn('steps10k', d);
     if (w.n >= 3) earn('week3', d);
-    const st = streakTo(wk, x => x.n > 0); if (st >= 4) earn('streak4', d); if (st >= 12) earn('streak12', d);
+    // weekly streaks count treadmill walks/runs only
+    if (!r.src){ tmWeeks.set(wk, { n: (tmWeeks.get(wk) || { n: 0 }).n + 1 });
+      const st = streakTo(wk, x => x.n > 0, tmWeeks); if (st >= 4) earn('streak4', d); if (st >= 12) earn('streak12', d); }
     if (goal > 0 && streakTo(wk, x => x.dist >= goal) >= 4) earn('goal4', d);
     if (hr < 7) earn('early', d); if (hr >= 21) earn('night', d);
     if (nWo >= 10) earn('wo10', d);
@@ -4756,7 +4785,7 @@ function computeBadges(pid, extra = []){
   if (stk.comeback) earn('comeback', stk.comeback);
   // Perfect week: every day Monday to Sunday has at least 10 minutes (the run in progress counts, so it can unlock live)
   const midnight = t => { const x = new Date(t); x.setHours(0, 0, 0, 0); return x.getTime(); };
-  const dayTot = new Map(); runs.forEach(r => { const k = midnight(r.date); dayTot.set(k, (dayTot.get(k) || 0) + r.moving); });
+  const dayTot = new Map(); runs.filter(r => !r.src).forEach(r => { const k = midnight(r.date); dayTot.set(k, (dayTot.get(k) || 0) + r.moving); });
   [...new Set([...dayTot.keys()].map(k => weekStart(k).getTime()))].sort((a, b) => a - b).forEach(ws => {
     const x = new Date(ws); let ok = true;
     for (let i = 0; i < 7; i++){ if ((dayTot.get(x.getTime()) || 0) < 600){ ok = false; break; } if (i < 6) x.setDate(x.getDate() + 1); }
@@ -4770,14 +4799,20 @@ function computeBadges(pid, extra = []){
   prog.plans3 = [nPlans / 3, `${nPlans} of 3 plans finished`];
   prog.presets = [presetsDone.size / presetIds.size, `${presetsDone.size} of ${presetIds.size} ready-made workouts finished`];
   prog.losing5 = [lose / 5, `${lose} of 5 weeks`];
-  // virtual journeys: a badge for each one finished (first finish counts), plus collections
-  const jDone = {}; (ps.journeysDone || []).forEach(x => { if (jById(x.id) && !(x.id in jDone)) jDone[x.id] = x.end; });
+  // virtual journeys: solo journeys and finished household challenges both count (first finish of each)
+  const jDone = {}, soloDone = {}; (ps.journeysDone || []).forEach(x => { if (jById(x.id) && !(x.id in soloDone)) soloDone[x.id] = x.end; });
+  Object.assign(jDone, soloDone);
+  Object.entries(chPatchResults(pid)).forEach(([id, rs]) => { if (jById(id) && rs.length) jDone[id] = Math.min(jDone[id] || Infinity, rs[0].when); });
+  // Lone Wolf: a journey finished on your own, so challenge distance never counts towards it
+  const soloIds = Object.keys(soloDone);
+  if (soloIds.length) earn('lonewolf', Math.min(...soloIds.map(id => soloDone[id])));
   const jIds = Object.keys(jDone), jWhen = ids => Math.max(...ids.map(id => jDone[id]));
   if (jIds.length) earn('jfirst', Math.min(...jIds.map(id => jDone[id])));
   if (jIds.length >= 5) earn('j5', jIds.map(id => jDone[id]).sort((a, b) => a - b)[4]);
   if (JOURNEYS.every(j => j.id in jDone)) earn('jall', jWhen(JOURNEYS.map(j => j.id)));
   const jNow = jState(pid);
   prog.jfirst = jNow && !jNow.done ? [jNow.km / jNow.len, `${Math.round(jNow.km / jNow.len * 100)}% through ${jNow.j.name}`] : [0, ''];
+  prog.lonewolf = prog.jfirst;
   prog.j5 = [Math.min(1, jIds.length / 5), `${jIds.length} of 5 journeys`];
   prog.jall = [jIds.length / JOURNEYS.length, `${jIds.length} of ${JOURNEYS.length} journeys`];
   // household challenges this person has raced in
@@ -4790,14 +4825,14 @@ function computeBadges(pid, extra = []){
 }
 const BADGE_GROUPS = [
   ['Getting started', ['first', 'twoday', 'explorer', 'week3', 'early', 'night']],
-  ['In one run', ['d5', 'd10', 'd21', 'd42', 'h1', 'steps10k', 'climb100']],
+  ['In one walk/run', ['d5', 'd10', 'd21', 'd42', 'h1', 'steps10k', 'climb100']],
   ['Speed', ['mi8', 'k5_30', 'mi7', 'k5_25', 'k10_60', 'k5_20', 'k10_50']],
   ['Distance and time', ['t50', 't100', 't250', 't500', 't1000', 'th10', 'th50', 'everest']],
-  ['Run count', ['c10', 'c25', 'c50', 'c100']],
+  ['Walk/run count', ['c10', 'c25', 'c50', 'c100']],
   ['Streaks and habits', ['day7', 'comeback', 'perfectweek', 'day30', 'day100', 'day365', 'streak4', 'streak12', 'goal4']],
   ['Workouts and plans', ['wo10', 'plan', 'presets', 'plans3']],
   ['Weekly badges', ['pod5', 'gold1', 'gold5', 'giant', 'losing5']],
-  ['Journey badges', ['jfirst', 'j5', 'jall', 'chdone', 'chwin']]
+  ['Journey badges', ['jfirst', 'lonewolf', 'j5', 'jall', 'chdone', 'chwin']]
 ];
 function renderBadges(){
   const { got, prog } = computeBadges(profiles.current), n = BADGES.filter(b => got[b.id]).length;
@@ -4912,7 +4947,7 @@ function barChart(items, goal){
 }
 function paceChart(runs){
   const pts = runs.filter(r => r.dist >= 1000).slice(0, 20).reverse().map(r => ({ d: r.date, p: r.moving / (r.dist / unitM()) }));
-  if (pts.length < 2) return '<p class="muted">Pace trend appears after two runs of at least 1 km.</p>';
+  if (pts.length < 2) return '<p class="muted">Pace trend appears after two walks/runs of at least 1 km.</p>';
   const W = 320, H = 132, pl = 34, pr = 8, pt = 10, pb = 18;
   let mn = Math.min(...pts.map(p => p.p)), mx = Math.max(...pts.map(p => p.p));
   if (mx - mn < 20){ mn -= 10; mx += 10; }
@@ -5352,7 +5387,7 @@ function renderJourney(){
   if (!st){
     const doneN = (settings.journeysDone || []).length;
     box.innerHTML = `<p class="muted">Run along a real route. Every run moves you further, with a celebration at each town you pass.${doneN ? ` You’ve finished ${doneN} journey${doneN === 1 ? '' : 's'} so far.` : ''}</p>
-      ${activeRace() ? `<div class="jwarn"><p>🤝 You’re racing <strong>${esc(activeRace().jo.name)}</strong>, so solo journeys are paused until the race ends. Your runs count for the race.</p></div>`
+      ${activeRace() ? `<div class="jwarn"><p>🤝 You’re racing <strong>${esc(activeRace().jo.name)}</strong>, so solo journeys are paused until the race ends. Your walks/runs count for the race.</p></div>`
         : `<div class="row"><button class="sm primary" data-jr="pick">Choose a journey</button></div>`}${pausedHtml()}${chHtml()}`;
     return;
   }
@@ -5497,7 +5532,7 @@ function chHtml(){
     parts.push(`<div class="chcard chwait"><p>${c.status === 'pending' ? `⏳ Waiting for ${esc(andList(names))} to accept <strong>${esc(c.jo.name)}</strong>.` : c.status === 'declined' ? `${esc(andList(names))} turned down <strong>${esc(c.jo.name)}</strong>.` : `Your <strong>${esc(c.jo.name)}</strong> invite expired.`}</p>
       <div class="row">${c.status === 'pending' ? `<button class="sm" data-chcancel="${c.id}">Cancel invite</button>` : `<button class="sm" data-chhide="${c.id}">Clear</button>`}</div></div>`);
   });
-  return `<h4 class="jgrp">Household challenges</h4>${parts.join('') || '<p class="muted">Race someone in your household along any journey. Your runs count for your own journey and the race at the same time.</p>'}
+  return `<h4 class="jgrp">Household challenges</h4>${parts.join('') || '<p class="muted">Race someone in your household along any journey. Your walks/runs count for your own journey and the race at the same time.</p>'}
     ${activeRace() ? '' : '<div class="row"><button class="sm" data-chnew>🤝 Challenge someone</button></div>'}`;
 }
 function openChallenge(){
@@ -5528,7 +5563,7 @@ function chAct(e){
     if (activeRace()){ toast(`Finish your ${activeRace().jo.name} race first. You can race one challenge at a time.`); return true; }
     const st = jState();
     if (st && !st.done && st.km > 0 && !confirm(`Accepting pauses ${st.j.name} at ${kmU(st.km)} until the race ends. You can do one journey at a time. Accept?`)) return true;
-    reply(true); renderJourney(); toast('Challenge accepted. Your runs from now on count for the race, good luck!'); if (settings.confetti) confetti(2);
+    reply(true); renderJourney(); toast('Challenge accepted. Your walks/runs from now on count for the race, good luck!'); if (settings.confetti) confetti(2);
   }
   else if (t.dataset.chno){ reply(false); toast('Challenge declined'); }
   else if (t.dataset.chcancel){
@@ -5899,11 +5934,11 @@ function renderPcard(){
   const pills = [hTxt, settings.weight ? wtFmt(+settings.weight) : '', age ? `${age} years` : '', g || ''].filter(Boolean).map(t => `<span class="ppill">${t}</span>`).join('');
   const dist = runs.reduce((a, r) => a + r.dist, 0), time = runs.reduce((a, r) => a + r.moving, 0);
   $('#pcard').innerHTML = `<div class="pc-banner"><button class="sm pc-edit" id="pcEdit">Edit</button></div><div class="pc-top"><span class="pav pc-av${me.photo ? ' has-photo' : ''}" aria-hidden="true">${avatarInner(me)}</span>
-      <div class="pc-name"><strong>${esc(me.name)}</strong><span class="muted">${first ? `Running since ${new Date(first).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })}` : 'No runs yet'}</span></div>
+      <div class="pc-name"><strong>${esc(me.name)}</strong><span class="muted">${first ? `Running since ${new Date(first).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })}` : 'No walks/runs yet'}</span></div>
 </div>
     <div class="ppills">${pills || '<button class="ppill add" id="pcAdd">Add your details</button>'}</div>
     <div class="ppills ppills2"><span class="ppill f">🔥 ${st.current} day${st.current === 1 ? '' : 's'}</span><span class="ppill b">🏅 ${nb} badge${nb === 1 ? '' : 's'}</span><span class="ppill g">🥇 ${golds} gold${golds === 1 ? '' : 's'}</span></div>
-    <div class="pc-nums"><div><b>${fD(dist, 0)} ${dU()}</b><span class="muted">All time</span></div><div><b>${runs.length}</b><span class="muted">Runs</span></div><div><b>${fmtTime(time)}</b><span class="muted">On the belt</span></div></div>`;
+    <div class="pc-nums"><div><b>${fD(dist, 0)} ${dU()}</b><span class="muted">All time</span></div><div><b>${runs.length}</b><span class="muted">Walks/runs</span></div><div><b>${fmtTime(time)}</b><span class="muted">On the belt</span></div></div>`;
 }
 function openPEdit(){
   const d = $('#pEditDlg');
@@ -5916,7 +5951,7 @@ function openPEdit(){
 }
 function renderHistory(){
   renderPcard(); showPsub(psub); renderBadges(); renderWeight(); renderPatches();
-  { const st = computeStreak(allRuns()); refreshStreak(st); renderStreakBox(st); }
+  { const st = computeStreak(allRuns()); refreshStreak(st); renderViewWho(); renderStreakBox(viewingPid() ? viewStreak() : st); }
   $('#bkNagH').innerHTML = backupDue() ? backupNag() : '';
   const runs = allRuns();
   const goal = settings.weeklyGoal || 0;
@@ -5933,7 +5968,7 @@ function renderHistory(){
     if (thisWeek >= goal) streak++;
     for (let i = 0; i < 520; i++){ cur.setDate(cur.getDate() - 7); if ((weekSums.get(cur.getTime()) || 0) >= goal) streak++; else break; }
   }
-  $('#weekline').textContent = `This week: ${fD(thisWeek, 1)}${goal ? ` of ${fD(goal, goal % unitM() ? 1 : 0)}` : ''} ${dU()}, ${runsThisWeek} run${runsThisWeek === 1 ? '' : 's'}`;
+  $('#weekline').textContent = `This week: ${fD(thisWeek, 1)}${goal ? ` of ${fD(goal, goal % unitM() ? 1 : 0)}` : ''} ${dU()}, ${runsThisWeek} walk${runsThisWeek === 1 ? '/run' : 's/runs'}`;
   $('#goalbox').innerHTML = goal ? `
     <p><strong>${fD(thisWeek, 1)} of ${fD(goal, 1)} ${dU()}</strong> this week</p>
     <div class="prog"><i style="width:${Math.min(100, thisWeek / goal * 100).toFixed(1)}%"></i></div>
@@ -5966,9 +6001,9 @@ function renderHistory(){
   const allD = runs.reduce((a, r) => a + r.dist, 0), allT = runs.reduce((a, r) => a + r.moving, 0);
   const longest = runs.reduce((a, r) => Math.max(a, r.dist), 0);
   $('#totals').innerHTML = runs.length ? `
-    <div><div class="v">${fD(allD, 1)} ${dU()}</div><div class="l">All time, ${runs.length} run${runs.length === 1 ? '' : 's'}</div></div>
+    <div><div class="v">${fD(allD, 1)} ${dU()}</div><div class="l">All time, ${runs.length} walk${runs.length === 1 ? '/run' : 's/runs'}</div></div>
     <div><div class="v">${fmtTime(allT)}</div><div class="l">Total time</div></div>
-    <div><div class="v">${fD(longest)} ${dU()}</div><div class="l">Longest run</div></div>` : '';
+    <div><div class="v">${fD(longest)} ${dU()}</div><div class="l">Longest walk/run</div></div>` : '';
 
   // personal bests
   $('#pbs').innerHTML = BESTS.map(([key, D, label]) => {
@@ -5977,23 +6012,28 @@ function renderHistory(){
     return `<div><div class="v">${best ? fmtTime(best.t) : '–'}</div><div class="l">${label}${best ? `, ${fmtDate(best.date)}` : ''}</div></div>`;
   }).join('');
 
+  // the Walks/runs pane: your own, or another profile's to look at
+  const vp = viewingPid(), vpName = vp ? (profiles.list.find(x => x.id === vp) || {}).name : '';
+  const lr = vp ? profileRuns(vp) : runs;
+  $('#runsHead').textContent = vp ? `${vpName}’s walks/runs` : 'Walks/runs';
   // tag filters
-  const used = TAGS.filter(t => runs.some(r => (r.tags || []).includes(t)));
+  const used = TAGS.filter(t => lr.some(r => (r.tags || []).includes(t)));
   if (filterTag && !used.includes(filterTag)) filterTag = null;
   let dayChip = '';
   if (calSel){
-    const dr = runs.filter(r => dayKey(r.date) === calSel), dd = new Date(Math.floor(calSel / 10000), Math.floor(calSel / 100) % 100 - 1, calSel % 100);
+    const dr = lr.filter(r => dayKey(r.date) === calSel), dd = new Date(Math.floor(calSel / 10000), Math.floor(calSel / 100) % 100 - 1, calSel % 100);
     const lab = dd.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
     dayChip = `<button class="chip daychip" data-clearday aria-label="Showing ${lab}. Tap to show all runs" aria-pressed="true">${lab}: ${dr.length ? `${dr.length} run${dr.length === 1 ? '' : 's'}, ${fD(dr.reduce((a, r) => a + r.dist, 0))} ${dU()}` : 'no runs'} ✕</button>`;
   }
   $('#filters').innerHTML = dayChip + (used.length ? `<button class="chip" data-tag="" aria-pressed="${!filterTag}">All</button>` + used.map(t => `<button class="chip" data-tag="${esc(t)}" aria-pressed="${filterTag === t}">${esc(t)}</button>`).join('') : '');
 
   // run list
-  let shown = filterTag ? runs.filter(r => (r.tags || []).includes(filterTag)) : runs;
+  let shown = filterTag ? lr.filter(r => (r.tags || []).includes(filterTag)) : lr;
   if (calSel) shown = shown.filter(r => dayKey(r.date) === calSel);
   $('#empty').hidden = shown.length > 0;
-  $('#empty').textContent = !runs.length ? 'No runs yet. Your runs appear here when you finish them.' : calSel ? 'No runs recorded on this day.' : 'No runs with this tag.';
-  $('#export').hidden = !runs.length;
+  $('#empty').textContent = !lr.length ? (vp ? `${vpName} has no walks or runs yet.` : 'No walks or runs yet. They appear here when you finish them.') : calSel ? 'No walks/runs recorded on this day.' : 'No walks/runs with this tag.';
+  $('#export').hidden = !lr.length || !!vp;
+  $('#runs').dataset.pid = vp || '';
   let jm = null;   // set just below, before the rows are drawn
   const rowHtml = r => {
     const tags = (r.tags || []).map(t => `<span class="tagchip">${esc(t)}</span>`).join('');
@@ -6006,7 +6046,7 @@ function renderHistory(){
   const months = new Map();
   shown.forEach(r => { const d = new Date(r.date), k = d.getFullYear() * 100 + d.getMonth(); if (!months.has(k)) months.set(k, []); months.get(k).push(r); });
   const nowK = new Date().getFullYear() * 100 + new Date().getMonth(), filtering = !!(calSel || filterTag);
-  jm = jRunMap();
+  jm = jRunMap(vp || profiles.current);
   $('#runs').innerHTML = [...months.entries()].map(([k, rs], gi) => {
     const label = new Date(Math.floor(k / 100), k % 100, 1).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
     const km = rs.reduce((a, r) => a + r.dist, 0);
@@ -6074,8 +6114,9 @@ function updateRun(id, fn){
   fn(runs[i]); store.set(KEY, runs); return runs[i];
 }
 
-function openDetail(id){
-  const r = allRuns().find(x => x.id === id); if (!r) return;
+function openDetail(id, pid = null){
+  const own = !pid || pid === profiles.current, owner = own ? null : profiles.list.find(x => x.id === pid);
+  const r = (own ? allRuns() : profileRuns(pid)).find(x => x.id === id); if (!r) return;
   const arr = splitsOf(r), big = unitM();
   let prev = 0;
   const splits = arr.map(t => { const sp = t - prev; prev = t; return sp; });
@@ -6091,6 +6132,7 @@ function openDetail(id){
   const d = $('#detail');
   d.innerHTML = `
     <h3>${fmtDate(r.date)}, ${fmtClock(r.date)}</h3>
+    ${owner ? `<p class="muted" style="margin:0 0 .4rem">${esc(owner.name)}’s walk/run, view only</p>` : ''}
     ${r.workout ? `<p class="muted" style="margin:0 0 .4rem">${esc(r.workout)}</p>` : ''}
     ${r.src ? `<p class="muted" style="margin:0 0 .4rem">${r.title ? `<strong>${esc(r.title)}</strong>, ` : ''}${esc(impLabel(r))}</p>` : ''}
     <div class="stats">
@@ -6106,15 +6148,17 @@ function openDetail(id){
     <div class="chart">${runChart(r)}</div>
     ${(() => { const x = jRunMap().get(r.id); return x ? `<h4>Virtual journey</h4><p class="jdet">${jRunLine(x)}</p>` : ''; })()}
     ${zones ? `<h4>Time in heart rate zones</h4><div class="zones">${zones}</div>` : ''}
-    ${efforts ? `<h4>Best efforts in this run</h4><div class="stats">${efforts}</div>` : ''}
+    ${efforts ? `<h4>Best efforts in this walk/run</h4><div class="stats">${efforts}</div>` : ''}
     ${rows ? `<h4>Splits</h4><table><thead><tr><th>${isMi() ? 'Mile' : 'Km'}</th><th>Split${best != null ? ' (fastest in green)' : ''}</th></tr></thead><tbody>${rows}</tbody></table>` : ''}
-    <h4>Tags</h4>
+    ${own ? `<h4>Tags</h4>
     <div class="chips" id="dtags">${TAGS.map(t => `<button class="chip" data-t="${esc(t)}" aria-pressed="${tags.includes(t)}">${esc(t)}</button>`).join('')}</div>
     ${r.src ? `<label class="f"><span>Name</span><input id="dname" maxlength="60" placeholder="e.g. Canal loop" value="${esc(r.title || '')}"></label>` : ''}
-    <label class="f"><span>Notes</span><textarea id="dnote" placeholder="How did it feel?">${esc(r.note || '')}</textarea></label>
+    <label class="f"><span>Notes</span><textarea id="dnote" placeholder="How did it feel?">${esc(r.note || '')}</textarea></label>`
+    : `${tags.length ? `<h4>Tags</h4><div class="chips">${tags.map(t => `<span class="tagchip">${esc(t)}</span>`).join('')}</div>` : ''}
+    ${r.note ? `<h4>Notes</h4><p>${esc(r.note)}</p>` : ''}`}
     <div class="drow">
-      ${r.src ? '' : '<button class="sm" id="dtcx">Export to Garmin Connect</button>'}
-      <button class="sm danger" id="ddel">Delete run</button>
+      ${own && !r.src ? '<button class="sm" id="dtcx">Export to Garmin Connect</button>' : ''}
+      ${own ? '<button class="sm danger" id="ddel">Delete walk/run</button>' : ''}
       <button class="sm primary" id="dclose">Close</button>
     </div>`;
   d.querySelectorAll('#dtags .chip').forEach(b => b.onclick = () => {
@@ -6123,7 +6167,7 @@ function openDetail(id){
     if (rec) b.setAttribute('aria-pressed', rec.tags.includes(t));
     renderHistory();
   });
-  d.querySelector('#dnote').addEventListener('input', e => updateRun(id, x => x.note = e.target.value));
+  if (d.querySelector('#dnote')) d.querySelector('#dnote').addEventListener('input', e => updateRun(id, x => x.note = e.target.value));
   if (d.querySelector('#dname')){
     d.querySelector('#dname').addEventListener('input', e => updateRun(id, x => x.title = e.target.value.trim()));
     d.querySelector('#dname').addEventListener('change', () => renderHistory());
@@ -6150,11 +6194,11 @@ function openDetail(id){
       toast(err && err.name === 'AbortError' ? 'Export cancelled' : 'Couldn’t save the run file, so Garmin Connect wasn’t opened');
     } finally { btn.disabled = false; }
   };
-  d.querySelector('#ddel').onclick = () => {
-    if (!confirm('Delete this run? This can’t be undone.')) return;
+  if (d.querySelector('#ddel')) d.querySelector('#ddel').onclick = () => {
+    if (!confirm('Delete this walk/run? This can’t be undone.')) return;
     store.set(KEY, allRuns().filter(x => x.id !== id));
     if (window.mmHealth) mmHealth.onDeleted(id);
-    d.close(); renderHistory(); toast('Run deleted');
+    d.close(); renderHistory(); toast('Walk/run deleted');
   };
   d.showModal();
   d.scrollTop = 0;
@@ -6526,7 +6570,7 @@ $('#peSave').onclick = () => {
   saveSettings(); $('#pEditDlg').close(); renderHistory(); renderSettings(); renderLive(); renderWorkouts(); renderRunWorkout(); toast('Details saved');
 };
 $('#filters').addEventListener('click', e => { if (e.target.closest('[data-clearday]')){ calSel = null; renderHistory(); return; } const b = e.target.closest('button[data-tag]'); if (b){ filterTag = b.dataset.tag || null; renderHistory(); } });
-$('#runs').addEventListener('click', e => { const b = e.target.closest('button[data-id]'); if (b) openDetail(b.dataset.id); });
+$('#runs').addEventListener('click', e => { const b = e.target.closest('button[data-id]'); if (b) openDetail(b.dataset.id, $('#runs').dataset.pid || null); });
 $('#export').onclick = exportCsv;
 
 $('#unitSeg').addEventListener('click', e => { const b = e.target.closest('button[data-u]'); if (b){ settings.units = b.dataset.u; settings.unitsSet = true; saveSettings(); renderAll(); } });
@@ -6615,14 +6659,14 @@ function openMonthly(off = 1){
       <div><div class="v">${fmtTime(time)}</div><div class="l">Time running</div></div>
       <div><div class="v">${fP(avgPaceKm(time, dist))}</div><div class="l">Avg pace /${dU()}</div></div>
       <div><div class="v">${active}</div><div class="l">Active days</div></div>
-      <div><div class="v">${fD(longest.dist)} ${dU()}</div><div class="l">Longest run</div></div>
+      <div><div class="v">${fD(longest.dist)} ${dU()}</div><div class="l">Longest walk/run</div></div>
       <div><div class="v">${vs}</div><div class="l">${dU()} vs month before</div></div>
       ${steps ? `<div><div class="v">${Math.round(steps).toLocaleString('en-GB')}</div><div class="l">Steps (est.)</div></div>` : ''}
     </div>
     ${medTxt ? `<p>Weekly medals: <strong>${medTxt}</strong>.</p>` : ''}
     ${newB.length ? `<h4>Badges earned</h4><div class="mbadges">${newB.map(b => `<span class="mbadge"><span class="bdisc ${b.tier}"><span>${b.icon}</span></span>${esc(b.name)}</span>`).join('')}</div>` : ''}
     ${pbs.length ? `<h4>New personal bests</h4><ul class="sumlist">${pbs.map(x => `<li>${esc(x)}</li>`).join('')}</ul>` : ''}`
-    : '<p class="muted">No runs logged that month.</p>'}
+    : '<p class="muted">No walks/runs logged that month.</p>'}
     ${jReportLine(ms, me)}
     ${wtReportLine(ms, me, 'this month')}
     <div class="drow"><span><button class="sm" id="monPrev">‹ Earlier</button>${off > 1 ? ' <button class="sm" id="monNext">Later ›</button>' : ''}</span><button class="sm primary" id="sumClose">Close</button></div>`;
@@ -6744,11 +6788,11 @@ $('#glMap').addEventListener('click', e => {
 });
 $('#glFinish').addEventListener('click', () => { closeGlance(false); finishRun(); });
 $('#streakBox').addEventListener('click', e => {
-  const run_ = e.target.closest('[data-id]'); if (run_){ openDetail(run_.dataset.id); return; }
+  const run_ = e.target.closest('[data-id]'); if (run_){ openDetail(run_.dataset.id, viewingPid()); return; }
   const day = e.target.closest('[data-day]');
   if (day){ const k = +day.dataset.day; calSel = calSel === k ? null : k; renderHistory(); if (calSel) $('#runsHead').scrollIntoView({ behavior: 'smooth', block: 'start' }); return; }
   const b = e.target.closest('[data-cal]'); if (!b) return;
-  calOff = Math.max(0, calOff + (b.dataset.cal === 'prev' ? 1 : -1)); renderStreakBox(computeStreak(allRuns()));
+  calOff = Math.max(0, calOff + (b.dataset.cal === 'prev' ? 1 : -1)); renderStreakBox(viewStreak());
 });
 $('#glCtlBtn').addEventListener('click', e => {
   e.stopPropagation();
@@ -6845,7 +6889,7 @@ $('#forget').onclick = async () => {
 };
 $('#wipe').onclick = () => {
   if (!confirm('Delete every saved run? Back up first if you might want them. This can’t be undone.')) return;
-  store.set(KEY, []); renderHistory(); toast('All runs deleted');
+  store.set(KEY, []); renderHistory(); toast('All walks/runs deleted');
 };
 window.addEventListener('beforeunload', () => { if (run && !run.demo) store.set(DRAFT, toRecord(run)); });
 
@@ -6855,7 +6899,7 @@ if (draft){
   const runs = allRuns();
   if ((draft.dist >= 50 || draft.moving >= 60) && !runs.some(r => r.id === draft.id)){
     runs.unshift(draft); store.set(KEY, runs);
-    setTimeout(() => toast('Recovered an unfinished run from ' + fmtDate(draft.date)), 300);
+    setTimeout(() => toast('Recovered an unfinished walk/run from ' + fmtDate(draft.date)), 300);
   }
   store.del(DRAFT);
 }
@@ -6899,7 +6943,7 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape' && $('#badgeD
 setTimeout(() => { // once a day, if the streak is waiting on today's run
   const today = dayKey(Date.now());
   // only warn once both of this week's freezes are used, as until then a missed day is covered
-  if (STK.current && !STK.todayActive && !STK.todayHoliday && !STK.freezesLeft && store.get(RISKTOLD, 0) !== today){ store.set(RISKTOLD, today); toast(`🔥 Your ${STK.current}-day streak is at risk: both freezes are used this week, so run 10 minutes today to keep it.`); }
+  if (STK.current && !STK.todayActive && !STK.todayHoliday && !STK.freezesLeft && store.get(RISKTOLD, 0) !== today){ store.set(RISKTOLD, today); toast(`🔥 Your ${STK.current}-day streak is at risk: both freezes are used this week, so walk or run 10 minutes today to keep it.`); }
 }, 4200);
 initCelebs();
 setTimeout(() => whenPickerClosed(() => { if ($('#sumDlg').open) $('#sumDlg').addEventListener('close', () => setTimeout(checkNewBadges, 400), { once: true }); else checkNewBadges(); }), 1500);
