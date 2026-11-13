@@ -20,6 +20,7 @@ setTimeout(function(){ document.documentElement.classList.remove('mm-boot'); }, 
 <script src="build-info.js"></script>
 <script src="settings-nav.js"></script>
 <script src="updates.js"></script>
+<script src="podium.js"></script>
 <script src="notify.js"></script>
 <style>
 :root{
@@ -5570,15 +5571,81 @@ function chAct(e){
   renderJourney(); return true;
 }
 // after a run (and on opening the app): celebrate a race you've just won or finished, once
+/* ---------- the podium celebration (podium.js) ---------- */
+const podiumOK = () => !!(window.mmPodium && settings.confetti);
+const podiumSfx = () => !sfxOK() ? {} : {
+  roll: () => drumroll(actx.currentTime, 1.6),
+  pop: pan => popSound(.85, 850, 0, pan),
+  fizz: () => crackle(2.4, .09, 0),
+  fanfare: () => celebSound(celebById('m:gold'), true)
+};
+const ordinal = n => n + (n % 100 >= 11 && n % 100 <= 13 ? 'th' : ['th', 'st', 'nd', 'rd'][n % 10] || 'th');
+const tookLabel = ms => ms < DAY ? 'in a day' : `${Math.ceil(ms / DAY)} days`;
+const profOf = pid => profiles.list.find(x => x.id === pid) || { name: nameOf(pid) };
+// once the podium closes, show anything it was holding back (new badges, the next journey)
+function afterPodium(p){ return p.then(() => new Promise(r => setTimeout(r, 400))); }
+
+/* Weekly medals: the first time each profile opens the app in a new week, last week's podium. */
+const MEDPOD = 'mm-medpod-v1:';
+function medalPodiumCheck(){
+  if (profiles.list.length < 2 || run) return;
+  const w = weeklyResults()[0]; if (!w || !w.ranked.length) return;
+  if (w.ws < weekStart(Date.now()).getTime() - 7 * DAY) return;   // only the week that has just ended
+  const key = MEDPOD + profiles.current; let seen = 0;
+  try { seen = +localStorage.getItem(key) || 0; } catch(e){}
+  if (w.ws <= seen) return;
+  try { localStorage.setItem(key, String(w.ws)); } catch(e){}
+  const mine = w.ranked.findIndex(x => x.p.id === profiles.current), top = w.ranked[0];
+  const MED = [['🥇', '#E9B949', '#FBEBB5', 'gold'], ['🥈', '#9AA3AE', '#E6EAEE', 'silver'], ['🥉', '#B87445', '#F3D9C4', 'bronze']];
+  const md = MED[Math.max(0, mine)];
+  if (!podiumOK()){
+    toast(mine >= 0 ? `${md[0]} You won ${md[3]} last week with ${fD(w.ranked[mine].dist)} ${dU()}` : `🥇 ${top.p.name} won last week’s gold medal`);
+    return;
+  }
+  afterPodium(mmPodium.show({
+    title: 'Weekly medals',
+    sub: `Week of ${new Date(w.ws).toLocaleDateString('en-GB', { day: 'numeric', month: 'long' })}`,
+    players: w.ranked.map((x, i) => ({ name: x.p.name, photo: x.p.photo, place: i + 1, label: `${fD(x.dist)} ${dU()}` })),
+    finale: {
+      html: `<div class="pdm-medal" style="background:${md[2]};border-color:${md[1]}">${md[0]}</div>`,
+      title: mine >= 0 ? `You won ${md[3]}!` : `${top.p.name} takes gold`,
+      sub: mine >= 0 ? `${fD(w.ranked[mine].dist)} ${dU()} last week` : 'A new week starts now. Go get them.'
+    },
+    sfx: podiumSfx()
+  })).then(() => { renderLeaders(); setTimeout(checkNewBadges, 300); });
+}
+// wait for "Who's running?" and any open window to close first
+function whenFree(fn, wait = 2500){
+  const t = () => {
+    const wp = $('#whoPick');
+    if ((wp && !wp.hidden) || document.querySelector('dialog[open]') || (window.mmPodium && mmPodium.isOpen()) || run) return setTimeout(t, 1500);
+    fn();
+  };
+  setTimeout(t, wait);
+}
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') whenFree(medalPodiumCheck, 3000); });
+
 function chCheck(){
   const seen = settings.chSeen || {};
   chAll().filter(c => c.status === 'active' && chMine(c) && !seen[c.id]).forEach(c => {
     const s = chStandings(c), meRow = s.rows.find(r => r.pid === profiles.current);
     if (!meRow || !s.winner) return;          // nobody has finished yet
     if (meRow.fin){
-      const place = s.rows.indexOf(meRow) + 1;
+      const place = s.rows.indexOf(meRow) + 1, j = jById(c.j) || c.jo;
       settings.chSeen = Object.assign({}, settings.chSeen, { [c.id]: true }); saveSettings();
-      showBadgeText(place === 1 ? `🏆 You won the ${c.jo.name} challenge!` : `🏁 ${c.jo.name} challenge: you came ${place === 2 ? '2nd' : place === 3 ? '3rd' : place + 'th'}`);
+      if (podiumOK()){
+        const from = pid => pid === c.owner ? c.start : Math.max(c.start, (c.replies[pid] || {}).at || c.start);
+        afterPodium(mmPodium.show({
+          title: place === 1 ? 'You won the race!' : 'Race complete',
+          sub: `${c.jo.name}, ${kmU(jLen(c.jo))}`,
+          players: s.rows.slice(0, 3).map((r, i) => ({ name: r.name, photo: profOf(r.pid).photo, place: i + 1,
+            label: r.fin ? tookLabel(r.fin - from(r.pid)) : `still going, ${kmU(r.km)}` })),
+          finale: { html: patchSvg(j, true, 112, 'pd', place), title: 'Patch earned', sub: `You came ${ordinal(place)} of ${s.rows.length}` },
+          sfx: podiumSfx()
+        })).then(() => { checkNewBadges(); setTimeout(() => { enforceOneJourney(); renderJourney(); }, 1500); });
+        return;
+      }
+      showBadgeText(place === 1 ? `🏆 You won the ${c.jo.name} challenge!` : `🏁 ${c.jo.name} challenge: you came ${ordinal(place)}`);
       if (settings.confetti) confetti(place === 1 ? 10 : 3);
       setTimeout(checkNewBadges, 2200);
       setTimeout(() => { enforceOneJourney(); renderJourney(); }, 4500);   // race over: the paused solo journey carries on
@@ -5612,6 +5679,17 @@ function journeyCheck(){
   settings.journey.seen = st.passed;
   if (st.done){
     settings.journeysDone = (settings.journeysDone || []).concat({ id: st.j.id, start: st.a.start, end: Date.now(), spans: jSpans(st.a).map(([s, e]) => [s, e == null ? Date.now() : e]) });
+    if (podiumOK()){
+      const me = curProfile();
+      saveSettings(); renderJourney();
+      afterPodium(mmPodium.show({
+        title: 'Journey complete', sub: `${st.j.name}, ${kmU(jLen(st.j))}`,
+        players: [{ name: me.name, photo: me.photo, place: 1, label: tookLabel(Date.now() - st.a.start) }],
+        finale: { html: patchSvg(st.j, true, 112, 'pd'), title: 'Patch earned', sub: 'Finished on your own' },
+        sfx: podiumSfx()
+      })).then(checkNewBadges);   // its journey badge (and any collection badge) unlocks now
+      return;
+    }
     showBadgeText(`🏁 ${st.j.name} complete!`); toast(`🏁 You’ve finished ${st.j.name}!`);
     setTimeout(checkNewBadges, 2200);   // its journey badge (and any collection badge) unlocks now
   } else {
@@ -6928,6 +7006,7 @@ restoreDevices();
 { let just = 0; try { just = +sessionStorage.getItem(WPJUST) || 0; sessionStorage.removeItem(WPJUST); } catch(e){}
   if (Date.now() - just > 20000 && !store.get(DRAFT, null)) openWhoPick();
   document.documentElement.classList.remove('mm-boot'); }
+whenFree(medalPodiumCheck);
 whenPickerClosed(() => { setTimeout(() => { chNotify(); chCheck(); }, 2500); maybeWeeklySummary(); setTimeout(() => { if ($('#sumDlg').open) $('#sumDlg').addEventListener('close', () => setTimeout(maybeMonthly, 400), { once: true }); else maybeMonthly(); }, 1000); });
 renderBackupStatus();
 initBadgeSeen();

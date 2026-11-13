@@ -93,6 +93,7 @@
   /* ---------- back button and gesture ---------- */
   // Called by the Android app (MainActivity) on back; returns true when it handled it.
   window.mmBack = function () {
+    if (window.mmPodium && mmPodium.isOpen()) { mmPodium.close(); return true; }
     var dlgs = document.querySelectorAll('dialog[open]');
     if (dlgs.length) {
       var d = dlgs[dlgs.length - 1], ev = new Event('cancel', { cancelable: true });
